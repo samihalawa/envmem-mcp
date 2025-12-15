@@ -1,23 +1,28 @@
 {
-	"name": "hello-server",
+	"name": "env-reference-mcp",
 	"version": "1.0.0",
-	"description": "",
-	"main": "index.js",
-	"module": "./src/index.ts",
+	"description": "Semantic environment variable search MCP server on Cloudflare Workers",
+	"main": "src/index.ts",
 	"type": "module",
 	"scripts": {
-		"dev": "smithery dev",
-		"build": "smithery build"
+		"dev": "wrangler dev",
+		"deploy": "wrangler deploy",
+		"cf:d1:create": "wrangler d1 create env-reference-db",
+		"cf:d1:migrations": "wrangler d1 migrations apply env-reference-db",
+		"cf:vectorize:create": "wrangler vectorize create env-embeddings --dimensions=768 --metric=cosine",
+		"cf:queue:create": "wrangler queues create env-indexing-queue",
+		"setup": "npm run cf:d1:create && npm run cf:vectorize:create && npm run cf:queue:create"
 	},
-	"keywords": [],
+	"keywords": ["mcp", "environment", "variables", "semantic-search", "cloudflare", "vectorize"],
 	"author": "",
 	"license": "ISC",
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.20.0",
-		"@smithery/sdk": "^2.1.0",
 		"zod": "^3.25.46"
 	},
 	"devDependencies": {
-		"@smithery/cli": "^1.6.6"
+		"@cloudflare/workers-types": "^4.20241127.0",
+		"wrangler": "^3.94.0",
+		"typescript": "^5.7.2"
 	}
 }

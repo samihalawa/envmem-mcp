@@ -1,0 +1,39 @@
+name = "env-reference-mcp"
+main = "src/index.ts"
+compatibility_date = "2024-12-13"
+compatibility_flags = ["nodejs_compat"]  # CRITICAL: Required for MCP SDK
+
+# Cloudflare Workers AI with Gateway for observability
+[ai]
+binding = "AI"
+# gateway = "your-gateway-id"  # Uncomment for AI Gateway observability
+
+# Cloudflare D1 Database (SQLite) for metadata
+[[d1_databases]]
+binding = "DB"
+database_name = "env-reference-db"
+database_id = "YOUR_DATABASE_ID" # Set after running: wrangler d1 create env-reference-db
+
+# Cloudflare Vectorize for semantic search (768 dimensions for BGE-base-en-v1.5)
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "env-embeddings"
+
+# Cloudflare Queue for async embedding generation
+[[queues.producers]]
+binding = "QUEUE"
+queue = "env-indexing-queue"
+
+[[queues.consumers]]
+queue = "env-indexing-queue"
+max_batch_size = 10
+max_batch_timeout = 5
+
+# Observability
+[observability]
+enabled = true
+head_sampling_rate = 0.1
+
+# Environment variables
+[vars]
+ENVIRONMENT = "production"
