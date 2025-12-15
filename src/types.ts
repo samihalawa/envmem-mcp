@@ -26,7 +26,7 @@ export interface EnvVariable {
   id?: number;
   name: string;
   description: string;
-  category: 'ai_services' | 'browser_automation' | 'database' | 'monitoring' | 'deployment' | 'auth' | 'analytics' | 'storage' | 'other';
+  category: 'ai_services' | 'browser_automation' | 'database' | 'monitoring' | 'deployment' | 'auth' | 'analytics' | 'storage' | 'email' | 'sms' | 'social' | 'cms' | 'payment' | 'other';
   service: string;
   required: boolean;
   example?: string;

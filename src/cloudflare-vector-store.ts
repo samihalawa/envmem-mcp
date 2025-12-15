@@ -128,44 +128,68 @@ export class CloudflareVectorStore {
   }
 
   /**
+   * Get environment variable by ID
+   */
+  async getById(id: number): Promise<EnvVariable | null> {
+    const row = await this.env.DB.prepare(
+      'SELECT * FROM env_variables WHERE id = ?1'
+    )
+      .bind(id)
+      .first<any>();
+
+    return row ? this.rowToEnvVariable(row) : null;
+  }
+
+  /**
    * Search using semantic similarity (Vectorize)
    */
   private async semanticSearch(
     query: string,
     options: SearchOptions
   ): Promise<SearchResult[]> {
-    // Generate query embedding
-    const queryEmbedding = await this.generateEmbedding(query);
+    try {
+      // Generate query embedding
+      const queryEmbedding = await this.generateEmbedding(query);
 
-    // Search Vectorize
-    const vectorResults = await this.env.VECTORIZE.query(queryEmbedding, {
-      topK: (options.limit || 10) * 2, // Get extra for filtering
-      returnMetadata: true,
-    });
-
-    const results: SearchResult[] = [];
-
-    for (const match of vectorResults.matches) {
-      // Get full metadata from D1
-      const envVar = await this.getByName(match.id);
-      if (!envVar) continue;
-
-      // Apply filters
-      if (options.category && envVar.category !== options.category) continue;
-      if (options.service && envVar.service !== options.service) continue;
-      if (options.requiredOnly && !envVar.required) continue;
-      if (options.minScore && match.score < options.minScore) continue;
-
-      results.push({
-        env: envVar,
-        score: match.score,
-        matchType: 'semantic',
+      // Search Vectorize
+      const vectorResults = await this.env.VECTORIZE.query(queryEmbedding, {
+        topK: (options.limit || 10) * 2, // Get extra for filtering
+        returnMetadata: 'all',
       });
 
-      if (results.length >= (options.limit || 10)) break;
-    }
+      const results: SearchResult[] = [];
 
-    return results;
+      for (const match of vectorResults.matches) {
+        // Extract env variable ID from metadata or vector ID
+        const envId = (match.metadata as any)?.envVariableId ||
+          parseInt(match.id.replace('env-', ''));
+
+        if (!envId || isNaN(envId)) continue;
+
+        // Get full metadata from D1
+        const envVar = await this.getById(envId);
+        if (!envVar) continue;
+
+        // Apply filters
+        if (options.category && envVar.category !== options.category) continue;
+        if (options.service && envVar.service !== options.service) continue;
+        if (options.requiredOnly && !envVar.required) continue;
+        if (options.minScore && match.score < options.minScore) continue;
+
+        results.push({
+          env: envVar,
+          score: match.score,
+          matchType: 'semantic',
+        });
+
+        if (results.length >= (options.limit || 10)) break;
+      }
+
+      return results;
+    } catch (error) {
+      console.error('Semantic search error:', error);
+      return [];
+    }
   }
 
   /**
@@ -175,39 +199,99 @@ export class CloudflareVectorStore {
     query: string,
     options: SearchOptions
   ): Promise<SearchResult[]> {
-    let sql = `
-      SELECT ev.*, rank
-      FROM env_fts
-      JOIN env_variables ev ON env_fts.rowid = ev.id
-      WHERE env_fts MATCH ?1
-    `;
+    try {
+      // Convert query to FTS5 format: "send email" -> "send OR email"
+      const ftsQuery = query
+        .split(/\s+/)
+        .filter(word => word.length > 1)
+        .map(word => `"${word}"`)
+        .join(' OR ');
 
-    const params: any[] = [query];
+      if (!ftsQuery) return [];
+
+      let sql = `
+        SELECT ev.*, rank
+        FROM env_fts
+        JOIN env_variables ev ON env_fts.rowid = ev.id
+        WHERE env_fts MATCH ?1
+      `;
+
+      const params: any[] = [ftsQuery];
+
+      if (options.category) {
+        sql += ' AND ev.category = ?';
+        params.push(options.category);
+      }
+
+      if (options.service) {
+        sql += ' AND ev.service = ?';
+        params.push(options.service);
+      }
+
+      if (options.requiredOnly) {
+        sql += ' AND ev.required = 1';
+      }
+
+      sql += ' ORDER BY rank LIMIT ?';
+      params.push((options.limit || 10) * 2);
+
+      const { results } = await this.env.DB.prepare(sql)
+        .bind(...params)
+        .all<any>();
+
+      return results.map((row: any, i: number) => ({
+        env: this.rowToEnvVariable(row),
+        score: Math.max(0.1, 1.0 - (i / results.length)), // Normalize by position
+        matchType: 'keyword' as const,
+      }));
+    } catch (error) {
+      console.error('FTS search error, trying LIKE fallback:', error);
+      return this.likeSearch(query, options);
+    }
+  }
+
+  /**
+   * Fallback LIKE search when FTS fails
+   */
+  private async likeSearch(
+    query: string,
+    options: SearchOptions
+  ): Promise<SearchResult[]> {
+    const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+    if (words.length === 0) return [];
+
+    // Build LIKE conditions for each word
+    const conditions = words.map((_, i) =>
+      `(LOWER(name) LIKE ?${i + 1} OR LOWER(description) LIKE ?${i + 1} OR LOWER(service) LIKE ?${i + 1} OR LOWER(keywords) LIKE ?${i + 1})`
+    ).join(' OR ');
+
+    let sql = `SELECT * FROM env_variables WHERE (${conditions})`;
+    const params: any[] = words.map(w => `%${w}%`);
 
     if (options.category) {
-      sql += ' AND ev.category = ?';
+      sql += ' AND category = ?';
       params.push(options.category);
     }
 
     if (options.service) {
-      sql += ' AND ev.service = ?';
+      sql += ' AND service = ?';
       params.push(options.service);
     }
 
     if (options.requiredOnly) {
-      sql += ' AND ev.required = 1';
+      sql += ' AND required = 1';
     }
 
-    sql += ' ORDER BY rank LIMIT ?';
+    sql += ' LIMIT ?';
     params.push(options.limit || 10);
 
     const { results } = await this.env.DB.prepare(sql)
       .bind(...params)
       .all<any>();
 
-    return results.map((row: any) => ({
+    return results.map((row: any, i: number) => ({
       env: this.rowToEnvVariable(row),
-      score: 1.0 - (row.rank / results.length), // Normalize rank to 0-1
+      score: Math.max(0.1, 1.0 - (i / Math.max(results.length, 1))),
       matchType: 'keyword' as const,
     }));
   }
@@ -265,6 +349,21 @@ export class CloudflareVectorStore {
       .slice(0, options.limit || 10);
 
     return finalResults;
+  }
+
+  /**
+   * Get environment variables by service name
+   */
+  async getByService(service: string, includeOptional: boolean = true): Promise<EnvVariable[]> {
+    let sql = 'SELECT * FROM env_variables WHERE LOWER(service) = LOWER(?)';
+    if (!includeOptional) {
+      sql += ' AND required = 1';
+    }
+    const { results } = await this.env.DB.prepare(sql)
+      .bind(service)
+      .all<any>();
+
+    return results.map(this.rowToEnvVariable);
   }
 
   /**
