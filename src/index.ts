@@ -1,6 +1,6 @@
 import { CloudflareVectorStore } from './cloudflare-vector-store';
 import { sampleEnvVariables } from './sample-envs';
-import type { Env, MCPRequest, MCPResponse, QueueMessage } from './types';
+import type { Env, MCPRequest, MCPResponse } from './types';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -31,11 +31,13 @@ export default {
 
       // Seed endpoint (development only)
       if (url.pathname === '/seed' && request.method === 'POST') {
-        await store.bulkInsert(sampleEnvVariables);
+        const result = await store.bulkInsert(sampleEnvVariables);
 
         return new Response(JSON.stringify({
           success: true,
-          message: `Seeded ${sampleEnvVariables.length} environment variables`,
+          message: `Seeded ${result.inserted} environment variables (${result.indexed} indexed)`,
+          inserted: result.inserted,
+          indexed: result.indexed,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -103,85 +105,8 @@ export default {
     }
   },
 
-  /**
-   * Queue consumer for async embedding generation
-   * Pattern from: github.com/Foundation42/engram
-   */
-  async queue(batch: MessageBatch<QueueMessage>, env: Env, ctx: ExecutionContext): Promise<void> {
-    console.log(`Processing ${batch.messages.length} messages from queue`);
-
-    for (const message of batch.messages) {
-      try {
-        const { envVariableId, name, text } = message.body;
-
-        // Update status to processing
-        await env.DB.prepare(
-          'UPDATE indexing_status SET status = ? WHERE env_variable_id = ?'
-        ).bind('processing', envVariableId).run();
-
-        // Generate embedding using Workers AI
-        const embeddings = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
-          text: [text],
-        }) as { data: number[][] };
-
-        const vector = embeddings.data[0];
-
-        // Insert into Vectorize
-        const vectorId = `env-${envVariableId}`;
-        await env.VECTORIZE.insert([{
-          id: vectorId,
-          values: vector,
-          metadata: {
-            envVariableId,
-            name,
-            indexedAt: Date.now(),
-          },
-        }]);
-
-        // Update env_variables with vector_id and indexed_at
-        await env.DB.prepare(
-          'UPDATE env_variables SET vector_id = ?, indexed_at = ? WHERE id = ?'
-        ).bind(vectorId, Math.floor(Date.now() / 1000), envVariableId).run();
-
-        // Update status to indexed
-        await env.DB.prepare(
-          'UPDATE indexing_status SET status = ?, indexed_timestamp = ? WHERE env_variable_id = ?'
-        ).bind('indexed', Math.floor(Date.now() / 1000), envVariableId).run();
-
-        // Acknowledge successful processing
-        message.ack();
-
-        console.log(`✅ Indexed: ${name} (vector: ${vectorId})`);
-      } catch (error) {
-        console.error('Queue processing error:', error);
-
-        const retryCount = message.body.retryCount || 0;
-
-        // Update status to failed if max retries exceeded
-        if (retryCount >= 3) {
-          await env.DB.prepare(
-            'UPDATE indexing_status SET status = ?, error_message = ?, retry_count = ? WHERE env_variable_id = ?'
-          ).bind(
-            'failed',
-            error instanceof Error ? error.message : 'Unknown error',
-            retryCount,
-            message.body.envVariableId
-          ).run();
-
-          message.ack(); // Don't retry anymore
-        } else {
-          // Retry with incremented count
-          message.retry({
-            delaySeconds: Math.min(60 * Math.pow(2, retryCount), 3600), // Exponential backoff
-          });
-
-          await env.DB.prepare(
-            'UPDATE indexing_status SET retry_count = ? WHERE env_variable_id = ?'
-          ).bind(retryCount + 1, message.body.envVariableId).run();
-        }
-      }
-    }
-  },
+  // Queue consumer disabled - requires paid plan
+  // Using synchronous embedding generation in CloudflareVectorStore.insertEnvVariable()
 };
 
 /**

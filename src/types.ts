@@ -5,7 +5,7 @@ export interface Env {
   AI: Ai;
   DB: D1Database;
   VECTORIZE: VectorizeIndex;
-  QUEUE: Queue;
+  // QUEUE: Queue; // Requires paid plan - using sync embedding instead
   ENVIRONMENT: string;
 }
 

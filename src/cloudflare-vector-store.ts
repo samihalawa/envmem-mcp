@@ -36,10 +36,10 @@ export class CloudflareVectorStore {
   }
 
   /**
-   * Insert environment variable into D1 and queue for async embedding
-   * Pattern from: github.com/Foundation42/engram
+   * Insert environment variable into D1 with synchronous embedding generation
+   * (Modified from async queue pattern - queues require paid plan)
    */
-  async insertEnvVariable(envVar: EnvVariable): Promise<{ id: number; queued: boolean }> {
+  async insertEnvVariable(envVar: EnvVariable): Promise<{ id: number; indexed: boolean }> {
     // 1. Insert into D1 (metadata)
     const result = await this.env.DB.prepare(`
       INSERT INTO env_variables (name, description, category, service, required, example, keywords, related_to)
@@ -65,39 +65,66 @@ export class CloudflareVectorStore {
     // 2. Create indexing status record
     await this.env.DB.prepare(
       'INSERT INTO indexing_status (env_variable_id, status, queue_timestamp) VALUES (?, ?, ?)'
-    ).bind(result.id, 'queued', Math.floor(Date.now() / 1000)).run();
+    ).bind(result.id, 'processing', Math.floor(Date.now() / 1000)).run();
 
-    // 3. Queue for async embedding generation
-    const text = this.enrichText(envVar);
-    await this.env.QUEUE.send({
-      envVariableId: result.id,
-      name: envVar.name,
-      text,
-    });
+    // 3. Generate embedding synchronously (no queue on free plan)
+    try {
+      const text = this.enrichText(envVar);
+      const embedding = await this.generateEmbedding(text);
 
-    console.log(`✅ Queued: ${envVar.name} (id: ${result.id})`);
+      // 4. Insert into Vectorize
+      const vectorId = `env-${result.id}`;
+      await this.env.VECTORIZE.insert([{
+        id: vectorId,
+        values: embedding,
+        metadata: {
+          envVariableId: result.id,
+          name: envVar.name,
+          indexedAt: Date.now(),
+        },
+      }]);
 
-    return { id: result.id, queued: true };
+      // 5. Update env_variables with vector_id
+      await this.env.DB.prepare(
+        'UPDATE env_variables SET vector_id = ?, indexed_at = ? WHERE id = ?'
+      ).bind(vectorId, Math.floor(Date.now() / 1000), result.id).run();
+
+      // 6. Update indexing status
+      await this.env.DB.prepare(
+        'UPDATE indexing_status SET status = ?, indexed_timestamp = ? WHERE env_variable_id = ?'
+      ).bind('indexed', Math.floor(Date.now() / 1000), result.id).run();
+
+      console.log(`✅ Indexed: ${envVar.name} (vector: ${vectorId})`);
+      return { id: result.id, indexed: true };
+    } catch (error) {
+      // Update status to failed
+      await this.env.DB.prepare(
+        'UPDATE indexing_status SET status = ?, error_message = ? WHERE env_variable_id = ?'
+      ).bind('failed', error instanceof Error ? error.message : 'Unknown error', result.id).run();
+
+      console.error(`❌ Failed to index ${envVar.name}:`, error);
+      return { id: result.id, indexed: false };
+    }
   }
 
   /**
-   * Bulk insert environment variables (async queue pattern)
+   * Bulk insert environment variables (synchronous embedding)
    */
-  async bulkInsert(envVars: EnvVariable[]): Promise<{ inserted: number; queued: number }> {
+  async bulkInsert(envVars: EnvVariable[]): Promise<{ inserted: number; indexed: number }> {
     let inserted = 0;
-    let queued = 0;
+    let indexed = 0;
 
     for (const envVar of envVars) {
       try {
         const result = await this.insertEnvVariable(envVar);
         inserted++;
-        if (result.queued) queued++;
+        if (result.indexed) indexed++;
       } catch (error) {
         console.error(`Failed to insert ${envVar.name}:`, error);
       }
     }
 
-    return { inserted, queued };
+    return { inserted, indexed };
   }
 
   /**

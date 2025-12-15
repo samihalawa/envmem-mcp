@@ -12,22 +12,14 @@ binding = "AI"
 [[d1_databases]]
 binding = "DB"
 database_name = "env-reference-db"
-database_id = "YOUR_DATABASE_ID" # Set after running: wrangler d1 create env-reference-db
+database_id = "b75fd3ed-511d-4b3b-81bb-45b53bf2f432"
 
 # Cloudflare Vectorize for semantic search (768 dimensions for BGE-base-en-v1.5)
 [[vectorize]]
 binding = "VECTORIZE"
 index_name = "env-embeddings"
 
-# Cloudflare Queue for async embedding generation
-[[queues.producers]]
-binding = "QUEUE"
-queue = "env-indexing-queue"
-
-[[queues.consumers]]
-queue = "env-indexing-queue"
-max_batch_size = 10
-max_batch_timeout = 5
+# Queue disabled (requires paid plan) - using sync embedding generation
 
 # Observability
 [observability]
