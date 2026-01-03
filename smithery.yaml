@@ -1,5 +1,54 @@
 runtime: typescript
 name: envmem
-description: "EnvMem - Personal environment variable memory with semantic search"
-author: "EnvMem"
+description: "EnvMem - Personal environment variable memory with AI-powered semantic search. Store, search, and manage your environment variables with multi-tenant isolation."
+author: "samihalawa"
 version: "1.1.0"
+license: "MIT"
+homepage: "https://envmem.trigox.workers.dev"
+repository: "https://github.com/samihalawa/envmem-mcp"
+keywords:
+  - mcp
+  - environment-variables
+  - semantic-search
+  - cloudflare-workers
+  - ai
+  - claude
+  - dotenv
+  - api-keys
+
+# Configuration schema for Smithery
+configSchema:
+  type: object
+  properties:
+    apiKey:
+      type: string
+      description: "Your API key for isolated storage (any random string works)"
+      required: true
+  required:
+    - apiKey
+
+# Start command for npx
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      apiKey:
+        type: string
+        description: "API key for multi-tenant isolation"
+    required:
+      - apiKey
+  commandFunction: |-
+    (config) => ({
+      command: 'npx',
+      args: ['-y', 'envmem'],
+      env: {
+        ENVMEM_API_KEY: config.apiKey
+      }
+    })
+
+# HTTP transport for direct URL access
+httpTransport:
+  url: "https://envmem.trigox.workers.dev/mcp"
+  queryParams:
+    apikey: "{{apiKey}}"
