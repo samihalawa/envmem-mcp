@@ -22,8 +22,17 @@ export interface QueueMessage {
 /**
  * Environment variable metadata
  */
+/**
+ * User authentication context
+ */
+export interface AuthContext {
+  userId: string;
+  apiKey?: string;
+}
+
 export interface EnvVariable {
   id?: number;
+  userId?: string;  // For multi-tenant isolation
   name: string;
   description: string;
   category: 'ai_services' | 'browser_automation' | 'database' | 'monitoring' | 'deployment' | 'auth' | 'analytics' | 'storage' | 'email' | 'sms' | 'social' | 'cms' | 'payment' | 'other';

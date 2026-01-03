@@ -1,8 +1,158 @@
-# env-reference-mcp
+# EnvMem
 
-**Semantic Environment Variable Search MCP Server on Cloudflare Workers**
+**Your Environment Variables, Always at Hand**
 
-Production-grade MCP server with async semantic search using Cloudflare's edge platform. Agents can search environment variables using natural language queries like "browser automation" → `BROWSERBASE_API_KEY`, `E2B_API_KEY`, `PLAYWRIGHT_BROWSERS_PATH`.
+Personal environment variable memory with semantic search. Multi-tenant MCP server that remembers all your API keys, secrets, and configurations.
+
+[![npm version](https://badge.fury.io/js/envmem.svg)](https://www.npmjs.com/package/envmem)
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
+
+🌐 **Live Demo**: [https://envmem.trigox.workers.dev](https://envmem.trigox.workers.dev)
+📦 **NPM Package**: [https://www.npmjs.com/package/envmem](https://www.npmjs.com/package/envmem)
+
+## Features
+
+- 🔍 **Semantic Search** - Natural language queries powered by Cloudflare Vectorize
+- 🔐 **Multi-Tenant Isolation** - Each API key gets completely isolated storage
+- 🌐 **MCP Protocol** - Works with Claude, ChatGPT, and any MCP-compatible AI assistant
+- 📥 **Import from .env** - Paste your entire .env file, we parse and index automatically
+- 📦 **Service Bundles** - Get all env vars for Stripe + Supabase + SendGrid in one query
+- ⚡ **Edge-Native** - Sub-50ms responses from 300+ global locations
+- 🚀 **NPX Ready** - Run instantly with `npx envmem`
+
+---
+
+## Quick Start
+
+### Option 1: NPX (Recommended)
+
+Run EnvMem directly without installation:
+
+```bash
+# Run with API key
+ENVMEM_API_KEY=your-key npx envmem
+
+# Or run with help
+npx envmem --help
+```
+
+### Option 2: Claude Desktop / Claude Code
+
+Add to your MCP configuration (`~/.config/claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "envmem": {
+      "command": "npx",
+      "args": ["-y", "envmem"],
+      "env": {
+        "ENVMEM_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+### Option 3: Direct HTTP/SSE URL
+
+Use the MCP URL directly with API key in query string:
+
+```
+https://envmem.trigox.workers.dev/mcp?apikey=your-api-key
+```
+
+**MCP Client Config (URL mode):**
+```json
+{
+  "mcpServers": {
+    "envmem": {
+      "url": "https://envmem.trigox.workers.dev/mcp?apikey=your-api-key"
+    }
+  }
+}
+```
+
+### Option 4: Header Authentication
+
+```json
+{
+  "mcpServers": {
+    "envmem": {
+      "url": "https://envmem.trigox.workers.dev/mcp",
+      "headers": {
+        "x-api-key": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+---
+
+## Getting Your API Key
+
+Generate your own API key (any random string works):
+
+```bash
+# Generate a secure random key
+openssl rand -hex 16
+# Example output: 6f43ab7be7ccb6501daf22df7377cd79
+```
+
+Your API key creates an isolated storage partition. Each unique key = separate database.
+
+---
+
+## Usage
+
+### 1. Import Your Environment Variables
+
+```javascript
+// Import your entire .env file
+import_env_variables({
+  envText: `
+    OPENAI_API_KEY=sk-...
+    STRIPE_SECRET_KEY=sk_live_...
+    SUPABASE_URL=https://...
+    # Database connection
+    DATABASE_URL=postgres://...
+  `,
+  clearExisting: true  // Optional: start fresh
+})
+```
+
+### 2. Search Naturally
+
+```javascript
+// Natural language search
+search_env_variables({ query: "payment processing" })
+// → STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PUBLISHABLE_KEY
+
+search_env_variables({ query: "email sending" })
+// → SENDGRID_API_KEY, MAILJET_API_KEY, BREVO_API_KEY
+
+search_env_variables({ query: "AI code generation" })
+// → OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY
+```
+
+### 3. Get Specific Variables
+
+```javascript
+// Get by exact name
+get_env_by_name({ name: "OPENAI_API_KEY" })
+// → Full details with description, category, related vars
+```
+
+### 4. Get Service Bundles
+
+```javascript
+// Get all vars for multiple services
+get_envs_for_services({ services: ["Stripe", "OpenAI", "Supabase"] })
+// → Complete .env setup for your tech stack
+```
+
+---
 
 ## Architecture
 
@@ -10,325 +160,260 @@ Production-grade MCP server with async semantic search using Cloudflare's edge p
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        Cloudflare Workers                           │
 │                                                                     │
-│  ┌─────────────┐    ┌─────────────┐    ┌──────────────┐          │
-│  │ MCP Server  │───▶│   Queue     │───▶│   Consumer   │          │
-│  │ (HTTP)      │    │ (async)     │    │   Worker     │          │
-│  └─────────────┘    └─────────────┘    └──────────────┘          │
-│                                               │                     │
-│                                               ▼                     │
-│                                         Workers AI                  │
-│                                      (BGE-base-en-v1.5)            │
-│                                               │                     │
-│                          ┌────────────────────┴───────────────┐   │
-│                          ▼                                    ▼   │
-│                    Vectorize (768-dim)                  D1 SQLite  │
-│                    Semantic Search                      Metadata   │
+│  ┌─────────────┐    ┌─────────────┐    ┌──────────────┐           │
+│  │ MCP Server  │───▶│  Workers AI │───▶│  Vectorize   │           │
+│  │ (HTTP/SSE)  │    │ (Embeddings)│    │  (Semantic)  │           │
+│  └─────────────┘    └─────────────┘    └──────────────┘           │
+│         │                                      │                    │
+│         │                                      │                    │
+│         ▼                                      ▼                    │
+│   ┌──────────┐                         ┌───────────────┐           │
+│   │    D1    │◀────────────────────────│ Hybrid Search │           │
+│   │ (SQLite) │   Semantic + Keyword    │  60% + 30%    │           │
+│   └──────────┘                         └───────────────┘           │
 │                                                                     │
+│  Multi-Tenant: user_id isolation via API key hash                  │
 └─────────────────────────────────────────────────────────────────────┘
-
-Flow:
-1. MCP tool call → Insert to D1 → Queue message
-2. Queue consumer → Generate embedding → Store in Vectorize
-3. Search query → Hybrid (Vectorize + FTS5) → Ranked results
 ```
 
-## Features
-
-- 🚀 **Async Queue Processing** - Instant responses, background embeddings
-- 🔍 **Hybrid Search** - 60% semantic + 30% keyword + 10% metadata
-- ⚡ **Edge Performance** - <50ms queries on Cloudflare's global network  
-- 🎯 **Production-Ready** - Exponential backoff, retry logic, observability
-- 📊 **Analytics** - Track indexing status, search queries, popular results
-- 🌐 **Dual Interface** - HTTP API + MCP protocol
-
-## Stack (100% Cloudflare)
-
-- **Workers AI** - `@cf/baai/bge-base-en-v1.5` embeddings (768-dim)
-- **Vectorize** - Vector similarity search
-- **D1** - SQLite with FTS5 for keyword search + metadata
-- **Queue** - Async embedding generation
-- **Observability** - Request logging and monitoring
-
-## Setup
-
-### 1. Install Dependencies
-
-```bash
-npm install
-```
-
-### 2. Create Cloudflare Resources
-
-```bash
-# Create D1 database
-wrangler d1 create env-reference-db
-# Output: database_id = "abc-123-def..."
-
-# Create Vectorize index
-wrangler vectorize create env-embeddings --dimensions=768 --metric=cosine
-
-# Create Queue
-wrangler queues create env-indexing-queue
-```
-
-### 3. Configure wrangler.toml
-
-Replace `YOUR_DATABASE_ID` in `wrangler.toml` with the database_id from step 2:
-
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "env-reference-db"
-database_id = "abc-123-def..."  # <-- Your database ID here
-```
-
-### 4. Run Migrations
-
-```bash
-wrangler d1 migrations apply env-reference-db
-```
-
-### 5. Deploy
-
-```bash
-wrangler deploy
-```
-
-### 6. Seed Data
-
-```bash
-# Seed with 20+ sample environment variables
-curl -X POST https://your-worker.workers.dev/seed
-
-# Check indexing status
-curl https://your-worker.workers.dev/stats
-```
-
-## Usage
-
-### HTTP API
-
-```bash
-# Search for environment variables
-curl "https://your-worker.workers.dev/search?q=browser%20automation"
-
-# Filter by category
-curl "https://your-worker.workers.dev/search?q=ai&category=ai_services"
-
-# Get specific variable
-curl "https://your-worker.workers.dev/search?q=OPENAI_API_KEY"
-
-# Statistics
-curl "https://your-worker.workers.dev/stats"
-```
-
-### MCP Protocol
-
-Configure in Claude Code:
-
-```json
-{
-  "mcpServers": {
-    "env-reference": {
-      "url": "https://your-worker.workers.dev/mcp",
-      "type": "http"
-    }
-  }
-}
-```
-
-Then use in AI agents:
-
-```
-search_env_variables("browser automation")
-→ BROWSERBASE_API_KEY, E2B_API_KEY, PLAYWRIGHT_BROWSERS_PATH
-
-search_env_variables("AI code generation") 
-→ OPENAI_API_KEY, ANTHROPIC_API_KEY, GITHUB_COPILOT_TOKEN
-
-get_env_by_name("SENTRY_DSN")
-→ Full details including related variables
-```
+---
 
 ## MCP Tools
 
-### 1. search_env_variables
+| Tool | Description |
+|------|-------------|
+| `search_env_variables` | Semantic + keyword search for env vars |
+| `get_env_by_name` | Get full details by exact name |
+| `get_envs_for_services` | Get all vars for multiple services |
+| `list_env_categories` | List all categories with counts |
+| `import_env_variables` | Bulk import from .env text |
+| `add_env_variable` | Add a single variable |
+| `delete_env_variable` | Delete by name |
+| `clear_all_env_variables` | Delete all (requires confirm) |
+
+### search_env_variables
 
 Search using natural language queries with semantic + keyword matching.
 
-**Parameters:**
-- `query` (required): Natural language search
-- `category` (optional): Filter by category
-- `service` (optional): Filter by service
-- `requiredOnly` (optional): Only required variables
-- `limit` (optional): Max results (default: 10)
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `query` | string | ✅ | Natural language search (e.g., "AI code generation") |
+| `category` | string | | Filter by category (ai_services, payment, database, etc.) |
+| `service` | string | | Filter by service name |
+| `requiredOnly` | boolean | | Only return required variables |
+| `limit` | number | | Max results (default: 10, max: 50) |
 
-**Example:**
-```json
-{
-  "query": "monitoring and logging",
-  "category": "monitoring",
-  "limit": 5
-}
-```
+### get_env_by_name
 
-**Response:**
-```json
-{
-  "results": [
-    {
-      "name": "SENTRY_DSN",
-      "description": "Sentry error tracking...",
-      "category": "monitoring",
-      "service": "Sentry",
-      "required": false,
-      "relevanceScore": "0.892",
-      "matchType": "hybrid"
-    }
-  ]
-}
-```
+Get full details for a specific environment variable.
 
-### 2. get_env_by_name
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | ✅ | Exact variable name (e.g., "OPENAI_API_KEY") |
 
-Get full details for specific environment variable.
+### get_envs_for_services
 
-**Parameters:**
-- `name` (required): Exact variable name
+Get all environment variables needed for multiple services at once.
 
-### 3. list_env_categories
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `services` | string[] | ✅ | Service names (e.g., ["Stripe", "SendGrid", "Supabase"]) |
+| `includeOptional` | boolean | | Include optional vars (default: true) |
 
-List all categories with counts and services.
+### import_env_variables
 
-## Adding Your Variables
+Bulk import environment variables from .env format text.
 
-Edit `src/sample-envs.ts`:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `envText` | string | ✅ | .env file content (NAME=value with optional # comments) |
+| `clearExisting` | boolean | | Delete all existing before import (default: false) |
 
-```typescript
-{
-  name: 'YOUR_API_KEY',
-  description: 'Detailed description for semantic matching',
-  category: 'ai_services', // Choose appropriate category
-  service: 'YourService',
-  required: true,
-  example: 'your_example_value',
-  keywords: ['keyword1', 'keyword2', 'better', 'matching'],
-  relatedTo: ['RELATED_VAR_1', 'RELATED_VAR_2'],
-}
-```
+### add_env_variable
 
-Deploy and seed:
+Add a single environment variable.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | ✅ | Variable name |
+| `description` | string | ✅ | What this variable is used for |
+| `service` | string | ✅ | Service name |
+| `category` | string | | Category for grouping |
+| `example` | string | | Example value (will be sanitized) |
+| `required` | boolean | | Is this required? (default: false) |
+
+---
+
+## Categories
+
+| Category | Examples |
+|----------|----------|
+| `ai_services` | OpenAI, Anthropic, Google AI, Cohere |
+| `browser_automation` | Browserbase, E2B, Playwright |
+| `database` | Supabase, PlanetScale, MongoDB, Redis |
+| `monitoring` | Sentry, Datadog, LogRocket |
+| `deployment` | Vercel, Netlify, Fly.io, Railway |
+| `auth` | Auth0, Clerk, Firebase Auth |
+| `analytics` | PostHog, Mixpanel, Amplitude |
+| `storage` | AWS S3, Cloudflare R2, Cloudinary |
+| `email` | SendGrid, Mailjet, Resend |
+| `sms` | Twilio, Vonage |
+| `social` | Twitter API, GitHub, Discord |
+| `cms` | Contentful, Sanity, Strapi |
+| `payment` | Stripe, PayPal, SumUp |
+| `other` | Everything else |
+
+---
+
+## Authentication
+
+EnvMem uses API key authentication for multi-tenant isolation. Each unique API key gets its own isolated database partition.
+
+**Supported Methods (in priority order):**
+
+1. **Header (recommended):**
+   ```
+   x-api-key: your-api-key
+   ```
+
+2. **Bearer Token:**
+   ```
+   Authorization: Bearer your-api-key
+   ```
+
+3. **Query Parameter (easiest):**
+   ```
+   ?apikey=your-api-key
+   ```
+
+**How It Works:**
+- Your API key is hashed to create a stable user ID
+- All your data is stored with this user ID
+- Queries are automatically scoped to your data only
+- No API key = anonymous access (shared space)
+
+---
+
+## HTTP API
+
+For direct HTTP access (outside MCP):
 
 ```bash
+# Search
+curl "https://envmem.trigox.workers.dev/search?q=payment&apikey=your-key"
+
+# Health check
+curl "https://envmem.trigox.workers.dev/health?apikey=your-key"
+
+# API info
+curl "https://envmem.trigox.workers.dev/api"
+```
+
+---
+
+## Self-Hosting
+
+### Prerequisites
+
+- Node.js 18+
+- Cloudflare account with Workers, D1, and Vectorize access
+
+### Setup
+
+```bash
+# Clone repository
+git clone https://github.com/samihalawa/envmem-mcp.git
+cd envmem-mcp
+
+# Install dependencies
+npm install
+
+# Create Cloudflare resources
+wrangler d1 create env-reference-db
+wrangler vectorize create env-embeddings --dimensions=768 --metric=cosine
+
+# Update wrangler.toml with your database_id
+
+# Run migrations
+wrangler d1 migrations apply env-reference-db
+
+# Deploy
 wrangler deploy
-curl -X POST https://your-worker.workers.dev/seed
 ```
 
-## Architecture Patterns
+### Configuration
 
-### Async Queue Pattern (from engram repo)
+Edit `wrangler.toml`:
 
-```typescript
-// 1. Instant response
-await env.QUEUE.send({ envVariableId, name, text });
+```toml
+name = "envmem"
+main = "src/index.ts"
+compatibility_date = "2024-12-13"
+compatibility_flags = ["nodejs_compat"]
 
-// 2. Background processing
-async queue(batch, env) {
-  for (const msg of batch.messages) {
-    // Generate embeddings
-    const vector = await env.AI.run("@cf/baai/bge-base-en-v1.5", {
-      text: [msg.body.text]
-    });
-    
-    // Store in Vectorize
-    await env.VECTORIZE.insert([{ id, values: vector.data[0] }]);
-    
-    msg.ack();
-  }
-}
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "env-reference-db"
+database_id = "your-database-id"
+
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "env-embeddings"
+
+[assets]
+directory = "./public"
+
+[observability]
+enabled = true
 ```
 
-### Hybrid Search (60-30-10 scoring)
-
-```typescript
-// Semantic similarity (60%)
-vectorResults = await env.VECTORIZE.query(embedding, { topK: 20 });
-
-// Keyword matching (30%)  
-keywordResults = await env.DB.prepare(
-  'SELECT * FROM env_fts WHERE env_fts MATCH ?'
-).all(query);
-
-// Merge + metadata boost (10%)
-finalScore = (semantic * 0.6) + (keyword * 0.3) + (metadata * 0.1);
-```
-
-## Database Schema
-
-### env_variables
-- Core metadata (name, description, category, service)
-- Vector reference (vector_id, indexed_at)
-- Search data (keywords, related_to)
-
-### indexing_status
-- Track async processing (queued → processing → indexed/failed)
-- Retry counts and error messages
-
-### search_analytics
-- Query logging for insights
-- Top results tracking
+---
 
 ## Performance
 
-- **Queue Latency**: Instant (non-blocking)
-- **Embedding Generation**: ~20-30ms (Workers AI)
-- **Vector Search**: ~10ms (Vectorize)
-- **Keyword Search**: ~5ms (D1 FTS5)
-- **Total Search**: <50ms (hybrid)
-- **Cold Start**: ~100ms
+| Operation | Latency |
+|-----------|---------|
+| Search (hybrid) | <50ms |
+| Embedding generation | ~20-30ms |
+| Vector search | ~10ms |
+| Keyword search | ~5ms |
+| Cold start | ~100ms |
 
-## Monitoring
+---
 
-```bash
-# Check indexing queue
-wrangler queues consumer get env-indexing-queue
+## Pricing
 
-# View logs
-wrangler tail
+**Free Forever** - EnvMem is free for personal use:
 
-# D1 queries
-wrangler d1 execute env-reference-db --command \
-  "SELECT status, COUNT(*) FROM indexing_status GROUP BY status"
-```
+- ✅ Unlimited env variables
+- ✅ Semantic search
+- ✅ Multi-tenant isolation
+- ✅ MCP protocol support
+- ✅ API key authentication
+- ✅ Global edge deployment
 
-## Troubleshooting
+---
 
-### Embeddings not generating
+## Tech Stack
 
-Check queue consumer:
-```bash
-wrangler queues consumer get env-indexing-queue
-```
+- **Runtime**: Cloudflare Workers
+- **Embeddings**: Workers AI (`@cf/baai/bge-base-en-v1.5`, 768-dim)
+- **Vector Search**: Cloudflare Vectorize
+- **Database**: Cloudflare D1 (SQLite with FTS5)
+- **Protocol**: MCP (Model Context Protocol)
+- **CLI**: Node.js with stdio-to-HTTP proxy
 
-### Search returns no results
+---
 
-Check indexing status:
-```bash
-curl https://your-worker.workers.dev/stats
-```
+## Related Projects
 
-Should show `indexed` count > 0.
+- [mem0](https://github.com/mem0ai/mem0) - Memory layer for AI apps
+- [supermemory](https://github.com/supermemory/supermemory) - Personal knowledge base
 
-## Production Checklist
-
-- [x] `nodejs_compat` flag enabled
-- [x] Async queue processing
-- [x] Exponential backoff retry
-- [x] Observability enabled
-- [x] Error tracking in D1
-- [x] Search analytics
-- [ ] AI Gateway configured (optional)
-- [ ] Rate limiting (optional)
+---
 
 ## License
 
@@ -336,7 +421,4 @@ ISC
 
 ---
 
-**Inspired by:**
-- [Foundation42/engram](https://github.com/Foundation42/engram) - Async queue pattern
-- [miantiao-me/github-stars](https://github.com/miantiao-me/github-stars) - AutoRAG usage
-- [seratch/openai-sdk-knowledge-org](https://github.com/seratch/openai-sdk-knowledge-org) - Production patterns
+Built with ❤️ for developers who forget their env var names.

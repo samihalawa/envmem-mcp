@@ -1,9 +1,15 @@
 {
-	"name": "env-reference-mcp",
-	"version": "1.0.0",
-	"description": "Semantic environment variable search MCP server on Cloudflare Workers",
-	"main": "src/index.ts",
+	"name": "envmem",
+	"version": "1.1.0",
+	"description": "EnvMem - Personal environment variable memory with semantic search. Store, search, and manage your environment variables with AI-powered semantic search.",
+	"main": "bin/envmem.js",
 	"type": "module",
+	"bin": {
+		"envmem": "bin/envmem.js"
+	},
+	"files": [
+		"bin/"
+	],
 	"scripts": {
 		"dev": "wrangler dev",
 		"deploy": "wrangler deploy",
@@ -13,9 +19,17 @@
 		"cf:queue:create": "wrangler queues create env-indexing-queue",
 		"setup": "npm run cf:d1:create && npm run cf:vectorize:create && npm run cf:queue:create"
 	},
-	"keywords": ["mcp", "environment", "variables", "semantic-search", "cloudflare", "vectorize"],
-	"author": "",
-	"license": "ISC",
+	"keywords": ["mcp", "environment", "variables", "semantic-search", "cloudflare", "ai", "claude", "model-context-protocol", "env", "dotenv"],
+	"author": "samihalawa",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/samihalawa/envmem-mcp"
+	},
+	"homepage": "https://envmem.trigox.workers.dev",
+	"bugs": {
+		"url": "https://github.com/samihalawa/envmem-mcp/issues"
+	},
 	"dependencies": {
 		"@modelcontextprotocol/sdk": "^1.20.0",
 		"zod": "^3.25.46"

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EnvMem - Personal Environment Variable Memory</title>
+  <meta name="description" content="Semantic search for your environment variables. Multi-tenant MCP server for AI assistants.">
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #12121a;
+      --border: #1e1e2e;
+      --text: #e4e4e7;
+      --text-muted: #71717a;
+      --accent: #8b5cf6;
+      --accent-hover: #a78bfa;
+      --success: #22c55e;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+    
+    /* Header */
+    header {
+      padding: 20px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .logo span { color: var(--text); }
+    nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      margin-left: 24px;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--text); }
+    
+    /* Hero */
+    .hero {
+      padding: 100px 0;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 800;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: 20px;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto 40px;
+    }
+    .cta-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--accent); }
+    
+    /* Features */
+    .features {
+      padding: 80px 0;
+      background: var(--surface);
+    }
+    .features h2 {
+      text-align: center;
+      font-size: 32px;
+      margin-bottom: 48px;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+    }
+    .feature-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .feature-card h3 {
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: var(--accent);
+    }
+    .feature-card p { color: var(--text-muted); }
+    
+    /* Code Example */
+    .code-section {
+      padding: 80px 0;
+    }
+    .code-section h2 {
+      text-align: center;
+      font-size: 32px;
+      margin-bottom: 48px;
+    }
+    .code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      overflow-x: auto;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 14px;
+    }
+    .code-block .comment { color: var(--text-muted); }
+    .code-block .string { color: var(--success); }
+    .code-block .key { color: var(--accent); }
+    
+    /* Pricing */
+    .pricing {
+      padding: 80px 0;
+      background: var(--surface);
+      text-align: center;
+    }
+    .pricing h2 { font-size: 32px; margin-bottom: 16px; }
+    .pricing .subtitle {
+      color: var(--text-muted);
+      margin-bottom: 48px;
+    }
+    .price-card {
+      background: var(--bg);
+      border: 2px solid var(--accent);
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    .price-card h3 { font-size: 24px; margin-bottom: 8px; }
+    .price { font-size: 48px; font-weight: 800; color: var(--accent); }
+    .price span { font-size: 16px; color: var(--text-muted); }
+    .price-features {
+      list-style: none;
+      text-align: left;
+      margin: 32px 0;
+    }
+    .price-features li {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .price-features li::before {
+      content: "✓";
+      color: var(--success);
+      margin-right: 12px;
+    }
+    
+    /* Footer */
+    footer {
+      padding: 40px 0;
+      text-align: center;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 32px; }
+      .hero p { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container header-content">
+      <a href="/" class="logo">Env<span>Mem</span></a>
+      <nav>
+        <a href="#features">Features</a>
+        <a href="#usage">Usage</a>
+        <a href="#pricing">Pricing</a>
+        <a href="https://github.com/anthropics/claude-code" target="_blank">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <h1>Your Environment Variables,<br>Always at Hand</h1>
+      <p>Semantic search for your .env files. Multi-tenant MCP server that remembers all your API keys, secrets, and configurations.</p>
+      <div class="cta-buttons">
+        <a href="#usage" class="btn btn-primary">Get Started</a>
+        <a href="https://github.com/anthropics/claude-code" class="btn btn-secondary">View on GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="container">
+      <h2>Why EnvMem?</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <h3>Semantic Search</h3>
+          <p>Natural language queries powered by Cloudflare Vectorize. Ask "email sending" and find SendGrid, Mailjet, Brevo configs.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Multi-Tenant Isolation</h3>
+          <p>Each API key gets completely isolated storage. Your secrets never mix with others.</p>
+        </div>
+        <div class="feature-card">
+          <h3>MCP Protocol</h3>
+          <p>Works with Claude, ChatGPT, and any MCP-compatible AI assistant. Import once, search everywhere.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Import from .env</h3>
+          <p>Paste your entire .env file. We parse, categorize, and index automatically with AI-powered inference.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Service Bundles</h3>
+          <p>Setting up a new project? Get all env vars for Stripe + Supabase + SendGrid in one query.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Edge-Native</h3>
+          <p>Runs on Cloudflare Workers globally. Sub-50ms responses from 300+ locations.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="code-section" id="usage">
+    <div class="container">
+      <h2>Quick Start</h2>
+      <div class="code-block">
+<pre><span class="comment"># Add to your MCP config (Claude Desktop, etc.)</span>
+{
+  <span class="key">"mcpServers"</span>: {
+    <span class="key">"envmem"</span>: {
+      <span class="key">"url"</span>: <span class="string">"https://envmem.dev/mcp"</span>,
+      <span class="key">"headers"</span>: {
+        <span class="key">"x-api-key"</span>: <span class="string">"your-api-key-here"</span>
+      }
+    }
+  }
+}
+
+<span class="comment"># Or use with Smithery</span>
+npx @anthropic/smithery install envmem
+
+<span class="comment"># Import your .env file</span>
+<span class="key">import_env_variables</span>({
+  <span class="key">envText</span>: <span class="string">`
+    OPENAI_API_KEY=sk-...
+    STRIPE_SECRET_KEY=sk_live_...
+    SUPABASE_URL=https://...
+  `</span>
+})
+
+<span class="comment"># Then search naturally</span>
+<span class="key">search_env_variables</span>({ <span class="key">query</span>: <span class="string">"payment processing"</span> })
+<span class="comment">// Returns: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET...</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="pricing" id="pricing">
+    <div class="container">
+      <h2>Simple Pricing</h2>
+      <p class="subtitle">Free forever for personal use</p>
+      <div class="price-card">
+        <h3>Free Tier</h3>
+        <div class="price">$0<span>/month</span></div>
+        <ul class="price-features">
+          <li>Unlimited env variables</li>
+          <li>Semantic search</li>
+          <li>Multi-tenant isolation</li>
+          <li>MCP protocol support</li>
+          <li>API key authentication</li>
+          <li>Global edge deployment</li>
+        </ul>
+        <a href="#usage" class="btn btn-primary" style="width: 100%;">Get Started Free</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>Built with Cloudflare Workers, Vectorize, and D1</p>
+      <p style="margin-top: 8px;">
+        <a href="https://github.com/anthropics/claude-code">Open Source</a> · 
+        Made for developers who forget their env var names
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

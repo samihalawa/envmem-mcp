@@ -1,6 +1,44 @@
 import { CloudflareVectorStore } from './cloudflare-vector-store';
 import { sampleEnvVariables } from './sample-envs';
-import type { Env } from './types';
+import type { Env, EnvVariable, AuthContext } from './types';
+
+/**
+ * Extract API key and derive userId from request
+ * Simple approach: hash the API key to create a stable userId
+ */
+function getAuthContext(request: Request): AuthContext {
+  // Try multiple auth methods
+  const url = new URL(request.url);
+  const apiKey =
+    request.headers.get('x-api-key') ||
+    request.headers.get('authorization')?.replace('Bearer ', '') ||
+    url.searchParams.get('apikey') ||
+    url.searchParams.get('api_key');
+
+  if (!apiKey) {
+    // Anonymous user - backward compatible
+    return { userId: 'anonymous' };
+  }
+
+  // Create stable userId from API key using simple hash
+  // For production, you'd validate against a database
+  const userId = hashApiKey(apiKey);
+  return { userId, apiKey };
+}
+
+/**
+ * Simple hash function to create userId from API key
+ * In production, you'd use crypto.subtle.digest
+ */
+function hashApiKey(apiKey: string): string {
+  let hash = 0;
+  for (let i = 0; i < apiKey.length; i++) {
+    const char = apiKey.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return `user_${Math.abs(hash).toString(36)}`;
+}
 
 // JSON-RPC 2.0 types for MCP
 interface JsonRpcRequest {
@@ -20,7 +58,8 @@ interface JsonRpcResponse {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const store = new CloudflareVectorStore(env);
+    const auth = getAuthContext(request);
+    const store = new CloudflareVectorStore(env, auth);
 
     // CORS headers for MCP
     const corsHeaders = {
@@ -92,14 +131,49 @@ export default {
         });
       }
 
-      // Health check
-      if (url.pathname === '/' || url.pathname === '/health') {
+      // Debug endpoint
+      if (url.pathname === '/debug') {
+        const debugInfo = await store.getDebugInfo();
+
+        return new Response(JSON.stringify(debugInfo), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Health check endpoint
+      if (url.pathname === '/health') {
         const stats = await store.getStats();
 
         return new Response(JSON.stringify({
           status: 'healthy',
-          service: 'env-reference-mcp',
-          version: '1.0.0',
+          service: 'envmem',
+          version: '1.1.0',
+          userId: auth.userId,
+          authenticated: auth.userId !== 'anonymous',
+          stats,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // API info endpoint (for programmatic access)
+      if (url.pathname === '/api') {
+        const stats = await store.getStats();
+
+        return new Response(JSON.stringify({
+          name: 'envmem',
+          version: '1.1.0',
+          description: 'Personal environment variable memory with semantic search',
+          endpoints: {
+            mcp: '/mcp',
+            search: '/search?q=<query>',
+            health: '/health',
+            stats: '/stats',
+          },
+          auth: {
+            userId: auth.userId,
+            authenticated: auth.userId !== 'anonymous',
+          },
           stats,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -200,6 +274,90 @@ const MCP_TOOLS = [
       required: ['services'],
     },
   },
+  // ==================== MANAGEMENT TOOLS ====================
+  {
+    name: 'import_env_variables',
+    description: 'Import environment variables from .env format text. Parses NAME=value pairs with optional # comments for descriptions. Use this to populate YOUR personal env reference database.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        envText: {
+          type: 'string',
+          description: 'The .env file content to import. Format: NAME=value with optional # comments',
+        },
+        clearExisting: {
+          type: 'boolean',
+          default: false,
+          description: 'If true, delete all existing variables before importing',
+        },
+      },
+      required: ['envText'],
+    },
+  },
+  {
+    name: 'add_env_variable',
+    description: 'Add a single environment variable to your reference database',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Variable name (e.g., "OPENAI_API_KEY")',
+        },
+        description: {
+          type: 'string',
+          description: 'What this variable is used for',
+        },
+        category: {
+          type: 'string',
+          enum: ['ai_services', 'browser_automation', 'database', 'monitoring', 'deployment', 'auth', 'analytics', 'storage', 'email', 'sms', 'social', 'cms', 'payment', 'other'],
+          description: 'Category for grouping',
+        },
+        service: {
+          type: 'string',
+          description: 'Service name (e.g., "OpenAI", "Stripe")',
+        },
+        required: {
+          type: 'boolean',
+          default: false,
+          description: 'Is this variable required?',
+        },
+        example: {
+          type: 'string',
+          description: 'Example value (will be sanitized)',
+        },
+      },
+      required: ['name', 'description', 'service'],
+    },
+  },
+  {
+    name: 'delete_env_variable',
+    description: 'Delete an environment variable from your reference database by name',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Exact name of the variable to delete',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'clear_all_env_variables',
+    description: 'Delete ALL environment variables from the database. Use with caution!',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        confirm: {
+          type: 'boolean',
+          description: 'Must be true to confirm deletion',
+        },
+      },
+      required: ['confirm'],
+    },
+  },
 ];
 
 /**
@@ -235,26 +393,33 @@ async function handleJsonRpcRequest(
           tools: {},
         },
         serverInfo: {
-          name: 'env-reference-mcp',
-          version: '1.0.0',
+          name: 'envmem',
+          version: '1.1.0',
         },
-        instructions: `Use this server to find environment variables for any project.
+        instructions: `EnvMem - Personal environment variable memory. Semantic search for YOUR env vars.
 
-WHEN TO USE:
-- User asks about .env setup or environment variables
-- Setting up a new project with external services
-- User mentions API keys, secrets, or credentials needed
-- Creating or updating .env files
+AUTHENTICATION:
+- Pass API key via x-api-key header, Bearer token, or ?api_key= query param
+- Each API key gets isolated storage (multi-tenant)
+- No API key = anonymous (shared) storage
 
-HOW TO USE:
-1. get_envs_for_services: BEST for .env setup - give list of services, get complete .env template
-   Example: services=["Stripe","OpenAI","Supabase"] → returns ready .env file
-2. search_env_variables: Natural language search (e.g., "email sending", "AI API")
-3. get_env_by_name: Get details for specific var (e.g., "STRIPE_SECRET_KEY")
-4. list_env_categories: Browse all categories and services
+FIRST TIME SETUP:
+1. Import your .env file: import_env_variables(envText="<your .env content>", clearExisting=true)
+2. Or add one at a time: add_env_variable(name, description, service, ...)
 
-AUTO-DETECT PROJECT:
-When user has package.json or mentions technologies, extract service names and call get_envs_for_services`,
+SEARCHING (after you've imported):
+1. search_env_variables: Natural language search (e.g., "email sending", "AI API")
+2. get_env_by_name: Get details for specific var (e.g., "STRIPE_SECRET_KEY")
+3. get_envs_for_services: Get all vars for services (e.g., ["Stripe","OpenAI"])
+4. list_env_categories: Browse all categories and counts
+
+MANAGEMENT:
+- import_env_variables: Bulk import from .env text
+- add_env_variable: Add a single variable
+- delete_env_variable: Remove by name
+- clear_all_env_variables: Delete all (requires confirm=true)
+
+NOTE: Your data is isolated by API key. Get your key at envmem.dev`,
       });
     }
 
@@ -278,7 +443,7 @@ When user has package.json or mentions technologies, extract service names and c
 
       if (toolName === 'search_env_variables') {
         const results = await store.search(args.query as string, {
-          category: args.category as string | undefined,
+          category: args.category as EnvVariable['category'] | undefined,
           service: args.service as string | undefined,
           requiredOnly: args.requiredOnly as boolean | undefined,
           limit: Math.min((args.limit as number) || 10, 50),
@@ -385,6 +550,108 @@ When user has package.json or mentions technologies, extract service names and c
               notFound: services.filter(s => !allEnvs[s]),
               envVars: allEnvs,
               template: envTemplate,
+            }, null, 2),
+          }],
+        });
+      }
+
+      // ==================== MANAGEMENT TOOLS ====================
+
+      if (toolName === 'import_env_variables') {
+        const envText = args.envText as string;
+        const clearExisting = args.clearExisting as boolean;
+
+        // Optionally clear existing data
+        if (clearExisting) {
+          await store.deleteAll();
+        }
+
+        // Parse and import
+        const parsed = store.parseEnvText(envText);
+        const result = await store.bulkInsert(parsed as EnvVariable[]);
+
+        return success({
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              message: `Imported ${result.inserted} environment variables (${result.indexed} indexed)`,
+              parsed: parsed.length,
+              inserted: result.inserted,
+              indexed: result.indexed,
+              clearedExisting: clearExisting,
+            }, null, 2),
+          }],
+        });
+      }
+
+      if (toolName === 'add_env_variable') {
+        const envVar: EnvVariable = {
+          name: args.name as string,
+          description: args.description as string,
+          category: (args.category as EnvVariable['category']) || 'other',
+          service: args.service as string,
+          required: args.required as boolean || false,
+          example: args.example as string || '',
+          keywords: [],
+          relatedTo: [],
+        };
+
+        const result = await store.insertEnvVariable(envVar);
+
+        return success({
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              message: `Added ${envVar.name}`,
+              id: result.id,
+              indexed: result.indexed,
+            }, null, 2),
+          }],
+        });
+      }
+
+      if (toolName === 'delete_env_variable') {
+        const name = args.name as string;
+        const deleted = await store.deleteByName(name);
+
+        return success({
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: deleted,
+              message: deleted ? `Deleted ${name}` : `Variable ${name} not found`,
+              name,
+            }, null, 2),
+          }],
+        });
+      }
+
+      if (toolName === 'clear_all_env_variables') {
+        const confirm = args.confirm as boolean;
+
+        if (!confirm) {
+          return success({
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                message: 'Deletion cancelled. Set confirm=true to delete all variables.',
+              }, null, 2),
+            }],
+          });
+        }
+
+        const result = await store.deleteAll();
+
+        return success({
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              message: `Deleted ${result.deleted} environment variables`,
+              deleted: result.deleted,
             }, null, 2),
           }],
         });

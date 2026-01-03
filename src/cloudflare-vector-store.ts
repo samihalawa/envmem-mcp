@@ -1,12 +1,38 @@
-import type { Env, EnvVariable, SearchResult, SearchOptions } from './types';
+import type { Env, EnvVariable, SearchResult, SearchOptions, AuthContext } from './types';
 
 /**
  * Vector store using Cloudflare Vectorize and D1
+ * Supports multi-tenant isolation via userId (when migration is applied)
  */
 export class CloudflareVectorStore {
+  private userId: string;
+  private multiTenantEnabled: boolean = false;
+
   constructor(
-    private env: Env
-  ) {}
+    private env: Env,
+    auth?: AuthContext
+  ) {
+    // Default to 'anonymous' for backward compatibility
+    this.userId = auth?.userId || 'anonymous';
+  }
+
+  /**
+   * Check if user_id column exists (lazy check, cached)
+   */
+  private async checkMultiTenant(): Promise<boolean> {
+    if (this.multiTenantEnabled) return true;
+    try {
+      const result = await this.env.DB.prepare(
+        "SELECT user_id FROM env_variables LIMIT 1"
+      ).first();
+      // If query succeeds (even with no results), column exists
+      this.multiTenantEnabled = true;
+      return true;
+    } catch {
+      // Column doesn't exist - running without multi-tenant
+      return false;
+    }
+  }
 
   /**
    * Generate embedding using Cloudflare Workers AI
@@ -40,23 +66,65 @@ export class CloudflareVectorStore {
    * (Modified from async queue pattern - queues require paid plan)
    */
   async insertEnvVariable(envVar: EnvVariable): Promise<{ id: number; indexed: boolean }> {
-    // 1. Insert into D1 (metadata)
-    const result = await this.env.DB.prepare(`
-      INSERT INTO env_variables (name, description, category, service, required, example, keywords, related_to)
-      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-      RETURNING id
-    `)
-      .bind(
-        envVar.name,
-        envVar.description,
-        envVar.category,
-        envVar.service,
-        envVar.required ? 1 : 0,
-        envVar.example || null,
-        JSON.stringify(envVar.keywords),
-        JSON.stringify(envVar.relatedTo)
-      )
-      .first<{ id: number }>();
+    const multiTenant = await this.checkMultiTenant();
+    let result: { id: number } | null;
+
+    if (multiTenant) {
+      // Multi-tenant mode: insert with user_id
+      result = await this.env.DB.prepare(`
+        INSERT INTO env_variables (user_id, name, description, category, service, required, example, keywords, related_to)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        ON CONFLICT(user_id, name) DO UPDATE SET
+          description = excluded.description,
+          category = excluded.category,
+          service = excluded.service,
+          required = excluded.required,
+          example = excluded.example,
+          keywords = excluded.keywords,
+          related_to = excluded.related_to,
+          updated_at = strftime('%s', 'now')
+        RETURNING id
+      `)
+        .bind(
+          this.userId,
+          envVar.name,
+          envVar.description,
+          envVar.category,
+          envVar.service,
+          envVar.required ? 1 : 0,
+          envVar.example || null,
+          JSON.stringify(envVar.keywords),
+          JSON.stringify(envVar.relatedTo)
+        )
+        .first<{ id: number }>();
+    } else {
+      // Legacy mode: insert without user_id
+      result = await this.env.DB.prepare(`
+        INSERT INTO env_variables (name, description, category, service, required, example, keywords, related_to)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+        ON CONFLICT(name) DO UPDATE SET
+          description = excluded.description,
+          category = excluded.category,
+          service = excluded.service,
+          required = excluded.required,
+          example = excluded.example,
+          keywords = excluded.keywords,
+          related_to = excluded.related_to,
+          updated_at = strftime('%s', 'now')
+        RETURNING id
+      `)
+        .bind(
+          envVar.name,
+          envVar.description,
+          envVar.category,
+          envVar.service,
+          envVar.required ? 1 : 0,
+          envVar.example || null,
+          JSON.stringify(envVar.keywords),
+          JSON.stringify(envVar.relatedTo)
+        )
+        .first<{ id: number }>();
+    }
 
     if (!result) {
       throw new Error(`Failed to insert env variable: ${envVar.name}`);
@@ -72,12 +140,13 @@ export class CloudflareVectorStore {
       const text = this.enrichText(envVar);
       const embedding = await this.generateEmbedding(text);
 
-      // 4. Insert into Vectorize
-      const vectorId = `env-${result.id}`;
+      // 4. Insert into Vectorize with userId for filtering
+      const vectorId = `env-${this.userId}-${result.id}`;
       await this.env.VECTORIZE.insert([{
         id: vectorId,
         values: embedding,
         metadata: {
+          userId: this.userId,
           envVariableId: result.id,
           name: envVar.name,
           indexedAt: Date.now(),
@@ -128,14 +197,21 @@ export class CloudflareVectorStore {
   }
 
   /**
-   * Get environment variable by ID
+   * Get environment variable by ID (scoped to user when multi-tenant enabled)
    */
   async getById(id: number): Promise<EnvVariable | null> {
-    const row = await this.env.DB.prepare(
-      'SELECT * FROM env_variables WHERE id = ?1'
-    )
-      .bind(id)
-      .first<any>();
+    const multiTenant = await this.checkMultiTenant();
+    let row: any;
+
+    if (multiTenant) {
+      row = await this.env.DB.prepare(
+        'SELECT * FROM env_variables WHERE id = ?1 AND user_id = ?2'
+      ).bind(id, this.userId).first<any>();
+    } else {
+      row = await this.env.DB.prepare(
+        'SELECT * FROM env_variables WHERE id = ?1'
+      ).bind(id).first<any>();
+    }
 
     return row ? this.rowToEnvVariable(row) : null;
   }
@@ -151,10 +227,11 @@ export class CloudflareVectorStore {
       // Generate query embedding
       const queryEmbedding = await this.generateEmbedding(query);
 
-      // Search Vectorize
+      // Search Vectorize with userId filter
       const vectorResults = await this.env.VECTORIZE.query(queryEmbedding, {
         topK: (options.limit || 10) * 2, // Get extra for filtering
         returnMetadata: 'all',
+        filter: { userId: this.userId },
       });
 
       const results: SearchResult[] = [];
@@ -200,6 +277,8 @@ export class CloudflareVectorStore {
     options: SearchOptions
   ): Promise<SearchResult[]> {
     try {
+      const multiTenant = await this.checkMultiTenant();
+
       // Convert query to FTS5 format: "send email" -> "send OR email"
       const ftsQuery = query
         .split(/\s+/)
@@ -209,14 +288,26 @@ export class CloudflareVectorStore {
 
       if (!ftsQuery) return [];
 
-      let sql = `
-        SELECT ev.*, rank
-        FROM env_fts
-        JOIN env_variables ev ON env_fts.rowid = ev.id
-        WHERE env_fts MATCH ?1
-      `;
+      let sql: string;
+      let params: any[];
 
-      const params: any[] = [ftsQuery];
+      if (multiTenant) {
+        sql = `
+          SELECT ev.*, rank
+          FROM env_fts
+          JOIN env_variables ev ON env_fts.rowid = ev.id
+          WHERE env_fts MATCH ?1 AND ev.user_id = ?2
+        `;
+        params = [ftsQuery, this.userId];
+      } else {
+        sql = `
+          SELECT ev.*, rank
+          FROM env_fts
+          JOIN env_variables ev ON env_fts.rowid = ev.id
+          WHERE env_fts MATCH ?1
+        `;
+        params = [ftsQuery];
+      }
 
       if (options.category) {
         sql += ' AND ev.category = ?';
@@ -257,16 +348,26 @@ export class CloudflareVectorStore {
     query: string,
     options: SearchOptions
   ): Promise<SearchResult[]> {
+    const multiTenant = await this.checkMultiTenant();
     const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 1);
     if (words.length === 0) return [];
 
-    // Build LIKE conditions for each word
+    // Build LIKE conditions for each word - offset param indices based on mode
+    const paramOffset = multiTenant ? 2 : 1;
     const conditions = words.map((_, i) =>
-      `(LOWER(name) LIKE ?${i + 1} OR LOWER(description) LIKE ?${i + 1} OR LOWER(service) LIKE ?${i + 1} OR LOWER(keywords) LIKE ?${i + 1})`
+      `(LOWER(name) LIKE ?${i + paramOffset} OR LOWER(description) LIKE ?${i + paramOffset} OR LOWER(service) LIKE ?${i + paramOffset} OR LOWER(keywords) LIKE ?${i + paramOffset})`
     ).join(' OR ');
 
-    let sql = `SELECT * FROM env_variables WHERE (${conditions})`;
-    const params: any[] = words.map(w => `%${w}%`);
+    let sql: string;
+    let params: any[];
+
+    if (multiTenant) {
+      sql = `SELECT * FROM env_variables WHERE user_id = ?1 AND (${conditions})`;
+      params = [this.userId, ...words.map(w => `%${w}%`)];
+    } else {
+      sql = `SELECT * FROM env_variables WHERE (${conditions})`;
+      params = [...words.map(w => `%${w}%`)];
+    }
 
     if (options.category) {
       sql += ' AND category = ?';
@@ -352,39 +453,66 @@ export class CloudflareVectorStore {
   }
 
   /**
-   * Get environment variables by service name
+   * Get environment variables by service name (scoped to user when multi-tenant enabled)
    */
   async getByService(service: string, includeOptional: boolean = true): Promise<EnvVariable[]> {
-    let sql = 'SELECT * FROM env_variables WHERE LOWER(service) = LOWER(?)';
+    const multiTenant = await this.checkMultiTenant();
+    let sql: string;
+    let params: any[];
+
+    if (multiTenant) {
+      sql = 'SELECT * FROM env_variables WHERE user_id = ? AND LOWER(service) = LOWER(?)';
+      params = [this.userId, service];
+    } else {
+      sql = 'SELECT * FROM env_variables WHERE LOWER(service) = LOWER(?)';
+      params = [service];
+    }
+
     if (!includeOptional) {
       sql += ' AND required = 1';
     }
     const { results } = await this.env.DB.prepare(sql)
-      .bind(service)
+      .bind(...params)
       .all<any>();
 
     return results.map(this.rowToEnvVariable);
   }
 
   /**
-   * Get environment variable by name
+   * Get environment variable by name (scoped to user when multi-tenant enabled)
    */
   async getByName(name: string): Promise<EnvVariable | null> {
-    const row = await this.env.DB.prepare(
-      'SELECT * FROM env_variables WHERE name = ?1'
-    )
-      .bind(name)
-      .first<any>();
+    const multiTenant = await this.checkMultiTenant();
+    let row: any;
+
+    if (multiTenant) {
+      row = await this.env.DB.prepare(
+        'SELECT * FROM env_variables WHERE user_id = ?1 AND name = ?2'
+      ).bind(this.userId, name).first<any>();
+    } else {
+      row = await this.env.DB.prepare(
+        'SELECT * FROM env_variables WHERE name = ?1'
+      ).bind(name).first<any>();
+    }
 
     return row ? this.rowToEnvVariable(row) : null;
   }
 
   /**
-   * Get all environment variables
+   * Get all environment variables (scoped to user when multi-tenant enabled)
    */
   async getAll(options: SearchOptions = {}): Promise<EnvVariable[]> {
-    let sql = 'SELECT * FROM env_variables WHERE 1=1';
-    const params: any[] = [];
+    const multiTenant = await this.checkMultiTenant();
+    let sql: string;
+    let params: any[];
+
+    if (multiTenant) {
+      sql = 'SELECT * FROM env_variables WHERE user_id = ?';
+      params = [this.userId];
+    } else {
+      sql = 'SELECT * FROM env_variables WHERE 1=1';
+      params = [];
+    }
 
     if (options.category) {
       sql += ' AND category = ?';
@@ -411,24 +539,67 @@ export class CloudflareVectorStore {
   }
 
   /**
-   * Get statistics
+   * Debug info for troubleshooting multi-tenant
+   */
+  async getDebugInfo() {
+    const multiTenant = await this.checkMultiTenant();
+
+    // Count records with different user_ids
+    const userCounts = await this.env.DB.prepare(
+      'SELECT user_id, COUNT(*) as count FROM env_variables GROUP BY user_id'
+    ).all<{ user_id: string; count: number }>();
+
+    return {
+      multiTenantEnabled: multiTenant,
+      currentUserId: this.userId,
+      userCounts: userCounts.results,
+    };
+  }
+
+  /**
+   * Get statistics (scoped to user when multi-tenant enabled)
    */
   async getStats() {
-    const total = await this.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM env_variables'
-    ).first<{ count: number }>();
+    const multiTenant = await this.checkMultiTenant();
 
-    const required = await this.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM env_variables WHERE required = 1'
-    ).first<{ count: number }>();
+    let total: { count: number } | null;
+    let required: { count: number } | null;
+    let byCategory: { results: { category: string; count: number }[] };
+    let byService: { results: { service: string; count: number }[] };
 
-    const byCategory = await this.env.DB.prepare(
-      'SELECT category, COUNT(*) as count FROM env_variables GROUP BY category'
-    ).all<{ category: string; count: number }>();
+    if (multiTenant) {
+      total = await this.env.DB.prepare(
+        'SELECT COUNT(*) as count FROM env_variables WHERE user_id = ?'
+      ).bind(this.userId).first<{ count: number }>();
 
-    const byService = await this.env.DB.prepare(
-      'SELECT service, COUNT(*) as count FROM env_variables GROUP BY service'
-    ).all<{ service: string; count: number }>();
+      required = await this.env.DB.prepare(
+        'SELECT COUNT(*) as count FROM env_variables WHERE user_id = ? AND required = 1'
+      ).bind(this.userId).first<{ count: number }>();
+
+      byCategory = await this.env.DB.prepare(
+        'SELECT category, COUNT(*) as count FROM env_variables WHERE user_id = ? GROUP BY category'
+      ).bind(this.userId).all<{ category: string; count: number }>();
+
+      byService = await this.env.DB.prepare(
+        'SELECT service, COUNT(*) as count FROM env_variables WHERE user_id = ? GROUP BY service'
+      ).bind(this.userId).all<{ service: string; count: number }>();
+    } else {
+      total = await this.env.DB.prepare(
+        'SELECT COUNT(*) as count FROM env_variables'
+      ).first<{ count: number }>();
+
+      required = await this.env.DB.prepare(
+        'SELECT COUNT(*) as count FROM env_variables WHERE required = 1'
+      ).first<{ count: number }>();
+
+      byCategory = await this.env.DB.prepare(
+        'SELECT category, COUNT(*) as count FROM env_variables GROUP BY category'
+      ).all<{ category: string; count: number }>();
+
+      byService = await this.env.DB.prepare(
+        'SELECT service, COUNT(*) as count FROM env_variables GROUP BY service'
+      ).all<{ service: string; count: number }>();
+    }
 
     return {
       total: total?.count || 0,
@@ -448,6 +619,7 @@ export class CloudflareVectorStore {
   private rowToEnvVariable(row: any): EnvVariable {
     return {
       id: row.id,
+      userId: row.user_id || 'anonymous', // Handle legacy rows without user_id
       name: row.name,
       description: row.description,
       category: row.category,
@@ -459,5 +631,264 @@ export class CloudflareVectorStore {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  /**
+   * Delete environment variable by name (scoped to user when multi-tenant enabled)
+   */
+  async deleteByName(name: string): Promise<boolean> {
+    const multiTenant = await this.checkMultiTenant();
+    let row: { id: number; vector_id: string | null } | null;
+
+    // Get the env var first to get vector_id
+    if (multiTenant) {
+      row = await this.env.DB.prepare(
+        'SELECT id, vector_id FROM env_variables WHERE user_id = ? AND name = ?'
+      ).bind(this.userId, name).first<{ id: number; vector_id: string | null }>();
+    } else {
+      row = await this.env.DB.prepare(
+        'SELECT id, vector_id FROM env_variables WHERE name = ?'
+      ).bind(name).first<{ id: number; vector_id: string | null }>();
+    }
+
+    if (!row) return false;
+
+    // Delete from Vectorize if indexed
+    if (row.vector_id) {
+      try {
+        await this.env.VECTORIZE.deleteByIds([row.vector_id]);
+      } catch (error) {
+        console.error(`Failed to delete vector ${row.vector_id}:`, error);
+      }
+    }
+
+    // Delete from indexing_status
+    await this.env.DB.prepare(
+      'DELETE FROM indexing_status WHERE env_variable_id = ?'
+    ).bind(row.id).run();
+
+    // Delete from env_variables
+    await this.env.DB.prepare(
+      'DELETE FROM env_variables WHERE id = ?'
+    ).bind(row.id).run();
+
+    return true;
+  }
+
+  /**
+   * Delete all environment variables (scoped to user when multi-tenant enabled)
+   */
+  async deleteAll(): Promise<{ deleted: number }> {
+    const multiTenant = await this.checkMultiTenant();
+
+    // Get all vector IDs (scoped by user when multi-tenant)
+    let envResults: { results: { id: number; vector_id: string }[] };
+
+    if (multiTenant) {
+      envResults = await this.env.DB.prepare(
+        'SELECT id, vector_id FROM env_variables WHERE user_id = ? AND vector_id IS NOT NULL'
+      ).bind(this.userId).all<{ id: number; vector_id: string }>();
+    } else {
+      envResults = await this.env.DB.prepare(
+        'SELECT id, vector_id FROM env_variables WHERE vector_id IS NOT NULL'
+      ).all<{ id: number; vector_id: string }>();
+    }
+
+    const vectorIds = envResults.results.map(r => r.vector_id).filter(Boolean);
+
+    // Delete from Vectorize in batches
+    if (vectorIds.length > 0) {
+      try {
+        // Vectorize deleteByIds has a limit, batch if needed
+        const batchSize = 100;
+        for (let i = 0; i < vectorIds.length; i += batchSize) {
+          const batch = vectorIds.slice(i, i + batchSize);
+          await this.env.VECTORIZE.deleteByIds(batch);
+        }
+      } catch (error) {
+        console.error('Failed to delete vectors:', error);
+      }
+    }
+
+    // Get IDs to delete indexing_status
+    const envIds = envResults.results.map(r => r.id);
+
+    // Delete from indexing_status for env vars
+    if (envIds.length > 0) {
+      for (const id of envIds) {
+        await this.env.DB.prepare('DELETE FROM indexing_status WHERE env_variable_id = ?').bind(id).run();
+      }
+    }
+
+    // Delete env_variables (scoped by user when multi-tenant)
+    let result: any;
+    if (multiTenant) {
+      result = await this.env.DB.prepare('DELETE FROM env_variables WHERE user_id = ?').bind(this.userId).run();
+    } else {
+      result = await this.env.DB.prepare('DELETE FROM env_variables').run();
+    }
+
+    return { deleted: result.meta.changes || 0 };
+  }
+
+  /**
+   * Parse .env format text into EnvVariable objects
+   * Handles comments and multi-line values
+   */
+  parseEnvText(text: string): Partial<EnvVariable>[] {
+    const envVars: Partial<EnvVariable>[] = [];
+    const lines = text.split('\n');
+
+    let currentCategory = 'other';
+    let currentDescription = '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // Skip empty lines
+      if (!trimmed) {
+        currentDescription = '';
+        continue;
+      }
+
+      // Category header: # ======= CATEGORY =======
+      if (trimmed.startsWith('#') && trimmed.includes('=====')) {
+        const match = trimmed.match(/#+\s*=+\s*(.+?)\s*=+/);
+        if (match) {
+          currentCategory = this.inferCategory(match[1]);
+        }
+        continue;
+      }
+
+      // Description comment: # Some description
+      if (trimmed.startsWith('#')) {
+        currentDescription = trimmed.replace(/^#+\s*/, '');
+        continue;
+      }
+
+      // Environment variable: NAME=value
+      const envMatch = trimmed.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
+      if (envMatch) {
+        const [, name, value] = envMatch;
+
+        envVars.push({
+          name,
+          description: currentDescription || `${name} environment variable`,
+          category: currentCategory as EnvVariable['category'],
+          service: this.inferService(name),
+          required: false,
+          example: this.sanitizeExample(value),
+          keywords: this.generateKeywords(name, currentDescription),
+          relatedTo: [],
+        });
+
+        currentDescription = '';
+      }
+    }
+
+    return envVars;
+  }
+
+  /**
+   * Infer category from header text
+   */
+  private inferCategory(header: string): EnvVariable['category'] {
+    const lower = header.toLowerCase();
+    if (lower.includes('ai') || lower.includes('llm')) return 'ai_services';
+    if (lower.includes('database') || lower.includes('db')) return 'database';
+    if (lower.includes('email') || lower.includes('smtp')) return 'email';
+    if (lower.includes('payment') || lower.includes('stripe')) return 'payment';
+    if (lower.includes('auth')) return 'auth';
+    if (lower.includes('deploy') || lower.includes('cloud') || lower.includes('hosting')) return 'deployment';
+    if (lower.includes('storage') || lower.includes('cdn')) return 'storage';
+    if (lower.includes('sms') || lower.includes('messaging') || lower.includes('twilio')) return 'sms';
+    if (lower.includes('social')) return 'social';
+    if (lower.includes('analytics')) return 'analytics';
+    if (lower.includes('cms')) return 'cms';
+    if (lower.includes('browser') || lower.includes('automation')) return 'browser_automation';
+    if (lower.includes('monitor')) return 'monitoring';
+    return 'other';
+  }
+
+  /**
+   * Infer service from variable name
+   */
+  private inferService(name: string): string {
+    const lower = name.toLowerCase();
+
+    // Common patterns
+    const servicePatterns: [RegExp, string][] = [
+      [/^openai/i, 'OpenAI'],
+      [/^gemini/i, 'Google Gemini'],
+      [/^claude|^anthropic/i, 'Anthropic'],
+      [/^stripe/i, 'Stripe'],
+      [/^supabase/i, 'Supabase'],
+      [/^cloudflare/i, 'Cloudflare'],
+      [/^twilio/i, 'Twilio'],
+      [/^sendgrid/i, 'SendGrid'],
+      [/^mailjet/i, 'Mailjet'],
+      [/^github/i, 'GitHub'],
+      [/^gitlab/i, 'GitLab'],
+      [/^docker/i, 'Docker'],
+      [/^aws/i, 'AWS'],
+      [/^gcp|^google/i, 'Google Cloud'],
+      [/^azure/i, 'Azure'],
+      [/^vercel/i, 'Vercel'],
+      [/^netlify/i, 'Netlify'],
+      [/^railway/i, 'Railway'],
+      [/^redis/i, 'Redis'],
+      [/^postgres/i, 'PostgreSQL'],
+      [/^mysql/i, 'MySQL'],
+      [/^mongo/i, 'MongoDB'],
+      [/^neon/i, 'Neon'],
+      [/^clerk/i, 'Clerk'],
+      [/^auth0/i, 'Auth0'],
+      [/^firebase/i, 'Firebase'],
+      [/^brevo|^sendinblue/i, 'Brevo'],
+      [/^smtp/i, 'SMTP'],
+      [/^imap/i, 'IMAP'],
+      [/^sumup/i, 'SumUp'],
+      [/^pinecone/i, 'Pinecone'],
+      [/^minio/i, 'MinIO'],
+      [/^digitalocean/i, 'DigitalOcean'],
+      [/^coolify/i, 'Coolify'],
+      [/^mistral/i, 'Mistral'],
+      [/^hugging|^hf_/i, 'Hugging Face'],
+    ];
+
+    for (const [pattern, service] of servicePatterns) {
+      if (pattern.test(name)) return service;
+    }
+
+    // Extract first word as service name
+    const firstPart = name.split('_')[0];
+    return firstPart.charAt(0).toUpperCase() + firstPart.slice(1).toLowerCase();
+  }
+
+  /**
+   * Sanitize example value (hide actual secrets)
+   */
+  private sanitizeExample(value: string): string {
+    // Return full value - this is a personal env reference, user needs actual secrets
+    return value;
+  }
+
+  /**
+   * Generate keywords from name and description
+   */
+  private generateKeywords(name: string, description: string): string[] {
+    const words = new Set<string>();
+
+    // Add name parts
+    name.toLowerCase().split('_').forEach(w => {
+      if (w.length > 2) words.add(w);
+    });
+
+    // Add description words
+    description.toLowerCase().split(/\W+/).forEach(w => {
+      if (w.length > 3) words.add(w);
+    });
+
+    return Array.from(words).slice(0, 10);
   }
 }
