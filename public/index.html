@@ -15,6 +15,8 @@
       --accent: #8b5cf6;
       --accent-hover: #a78bfa;
       --success: #22c55e;
+      --error: #ef4444;
+      --warning: #f59e0b;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -25,7 +27,7 @@
       min-height: 100vh;
     }
     .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-    
+
     /* Header */
     header {
       padding: 20px 0;
@@ -50,10 +52,10 @@
       transition: color 0.2s;
     }
     nav a:hover { color: var(--text); }
-    
+
     /* Hero */
     .hero {
-      padding: 100px 0;
+      padding: 60px 0;
       text-align: center;
     }
     .hero h1 {
@@ -97,11 +99,370 @@
       border: 1px solid var(--border);
     }
     .btn-secondary:hover { border-color: var(--accent); }
-    
+    .btn-sm {
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+    .btn-danger {
+      background: var(--error);
+      color: white;
+    }
+    .btn-danger:hover { background: #dc2626; }
+
+    /* Management Section */
+    .manage-section {
+      padding: 40px 0 80px;
+      background: var(--surface);
+    }
+    .manage-section h2 {
+      text-align: center;
+      font-size: 32px;
+      margin-bottom: 32px;
+    }
+
+    /* API Key Bar */
+    .api-key-bar {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .api-key-bar label {
+      display: block;
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .api-key-input-group {
+      display: flex;
+      gap: 12px;
+    }
+    .api-key-input-group input {
+      flex: 1;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: 'Monaco', 'Menlo', monospace;
+    }
+    .api-key-input-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .api-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .status-dot.connected { background: var(--success); }
+    .status-dot.disconnected { background: var(--error); }
+    .status-dot.checking { background: var(--warning); animation: pulse 1s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }
+    .tab {
+      padding: 10px 20px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .tab:hover { color: var(--text); background: var(--bg); }
+    .tab.active {
+      color: var(--accent);
+      background: var(--bg);
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Search Panel */
+    .search-panel {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .search-input-group {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .search-input-group input {
+      flex: 1;
+      padding: 14px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 16px;
+    }
+    .search-input-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .search-filters {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .search-filters select {
+      padding: 8px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    /* Results */
+    .results-container {
+      margin-top: 20px;
+    }
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      transition: border-color 0.2s;
+    }
+    .result-card:hover {
+      border-color: var(--accent);
+    }
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .result-name {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 15px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .result-score {
+      font-size: 12px;
+      padding: 2px 8px;
+      background: var(--bg);
+      border-radius: 4px;
+      color: var(--text-muted);
+    }
+    .result-description {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .result-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .result-meta span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .badge-category { background: #1e3a5f; color: #60a5fa; }
+    .badge-service { background: #1e3a2f; color: #4ade80; }
+    .badge-required { background: #3a1e1e; color: #f87171; }
+
+    /* Add Form */
+    .add-form {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-group label {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      padding: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .form-group textarea {
+      min-height: 80px;
+      resize: vertical;
+      font-family: inherit;
+    }
+    .form-group.full-width {
+      grid-column: 1 / -1;
+    }
+    .form-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    /* Import Panel */
+    .import-panel {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .import-textarea {
+      width: 100%;
+      min-height: 200px;
+      padding: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 13px;
+      resize: vertical;
+      margin-bottom: 16px;
+    }
+    .import-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .import-options {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .import-options label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .import-options input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
+
+    /* Stats Display */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Toast Notifications */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      padding: 14px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      animation: slideIn 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 400px;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .toast.success { background: var(--success); color: white; }
+    .toast.error { background: var(--error); color: white; }
+    .toast.info { background: var(--accent); color: white; }
+
     /* Features */
     .features {
       padding: 80px 0;
-      background: var(--surface);
     }
     .features h2 {
       text-align: center;
@@ -114,7 +475,7 @@
       gap: 24px;
     }
     .feature-card {
-      background: var(--bg);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 24px;
@@ -125,10 +486,11 @@
       color: var(--accent);
     }
     .feature-card p { color: var(--text-muted); }
-    
+
     /* Code Example */
     .code-section {
       padding: 80px 0;
+      background: var(--surface);
     }
     .code-section h2 {
       text-align: center;
@@ -136,7 +498,7 @@
       margin-bottom: 48px;
     }
     .code-block {
-      background: var(--surface);
+      background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 24px;
@@ -147,44 +509,7 @@
     .code-block .comment { color: var(--text-muted); }
     .code-block .string { color: var(--success); }
     .code-block .key { color: var(--accent); }
-    
-    /* Pricing */
-    .pricing {
-      padding: 80px 0;
-      background: var(--surface);
-      text-align: center;
-    }
-    .pricing h2 { font-size: 32px; margin-bottom: 16px; }
-    .pricing .subtitle {
-      color: var(--text-muted);
-      margin-bottom: 48px;
-    }
-    .price-card {
-      background: var(--bg);
-      border: 2px solid var(--accent);
-      border-radius: 16px;
-      padding: 40px;
-      max-width: 400px;
-      margin: 0 auto;
-    }
-    .price-card h3 { font-size: 24px; margin-bottom: 8px; }
-    .price { font-size: 48px; font-weight: 800; color: var(--accent); }
-    .price span { font-size: 16px; color: var(--text-muted); }
-    .price-features {
-      list-style: none;
-      text-align: left;
-      margin: 32px 0;
-    }
-    .price-features li {
-      padding: 12px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .price-features li::before {
-      content: "✓";
-      color: var(--success);
-      margin-right: 12px;
-    }
-    
+
     /* Footer */
     footer {
       padding: 40px 0;
@@ -193,10 +518,46 @@
       border-top: 1px solid var(--border);
     }
     footer a { color: var(--accent); text-decoration: none; }
-    
+
+    /* Loading Spinner */
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-overlay {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      color: var(--text-muted);
+      gap: 12px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+    }
+    .empty-state h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
     @media (max-width: 768px) {
       .hero h1 { font-size: 32px; }
       .hero p { font-size: 16px; }
+      .api-key-input-group { flex-direction: column; }
+      .search-input-group { flex-direction: column; }
+      .form-actions { flex-direction: column; }
     }
   </style>
 </head>
@@ -205,10 +566,10 @@
     <div class="container header-content">
       <a href="/" class="logo">Env<span>Mem</span></a>
       <nav>
+        <a href="#manage">Manage</a>
         <a href="#features">Features</a>
         <a href="#usage">Usage</a>
-        <a href="#pricing">Pricing</a>
-        <a href="https://github.com/anthropics/claude-code" target="_blank">GitHub</a>
+        <a href="https://github.com/samihalawa/envmem-mcp" target="_blank">GitHub</a>
       </nav>
     </div>
   </header>
@@ -218,8 +579,166 @@
       <h1>Your Environment Variables,<br>Always at Hand</h1>
       <p>Semantic search for your .env files. Multi-tenant MCP server that remembers all your API keys, secrets, and configurations.</p>
       <div class="cta-buttons">
-        <a href="#usage" class="btn btn-primary">Get Started</a>
-        <a href="https://github.com/anthropics/claude-code" class="btn btn-secondary">View on GitHub</a>
+        <a href="#manage" class="btn btn-primary">Start Managing</a>
+        <a href="https://www.npmjs.com/package/envmem" class="btn btn-secondary">npx envmem</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="manage-section" id="manage">
+    <div class="container">
+      <h2>Manage Your Environment Variables</h2>
+
+      <!-- API Key Bar -->
+      <div class="api-key-bar">
+        <label>Your API Key (stored locally in browser)</label>
+        <div class="api-key-input-group">
+          <input type="text" id="apiKeyInput" placeholder="Enter your API key or generate one..." />
+          <button class="btn btn-secondary btn-sm" onclick="generateApiKey()">Generate</button>
+          <button class="btn btn-primary btn-sm" onclick="connectWithApiKey()">Connect</button>
+        </div>
+        <div class="api-status" id="apiStatus">
+          <span class="status-dot disconnected" id="statusDot"></span>
+          <span id="statusText">Not connected</span>
+        </div>
+        <div class="stats-grid" id="statsGrid" style="display: none;">
+          <div class="stat-card">
+            <div class="stat-value" id="totalVars">0</div>
+            <div class="stat-label">Total Variables</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="totalServices">0</div>
+            <div class="stat-label">Services</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="totalCategories">0</div>
+            <div class="stat-label">Categories</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('search')">🔍 Search</button>
+        <button class="tab" onclick="switchTab('add')">➕ Add Variable</button>
+        <button class="tab" onclick="switchTab('import')">📥 Import .env</button>
+      </div>
+
+      <!-- Search Tab -->
+      <div class="tab-content active" id="searchTab">
+        <div class="search-panel">
+          <div class="search-input-group">
+            <input type="text" id="searchInput" placeholder="Search naturally... e.g., 'payment processing' or 'email sending'" onkeyup="handleSearchKeyup(event)" />
+            <button class="btn btn-primary" onclick="performSearch()">Search</button>
+          </div>
+          <div class="search-filters">
+            <select id="categoryFilter" onchange="performSearch()">
+              <option value="">All Categories</option>
+              <option value="ai_services">AI Services</option>
+              <option value="browser_automation">Browser Automation</option>
+              <option value="database">Database</option>
+              <option value="monitoring">Monitoring</option>
+              <option value="deployment">Deployment</option>
+              <option value="auth">Authentication</option>
+              <option value="analytics">Analytics</option>
+              <option value="storage">Storage</option>
+              <option value="email">Email</option>
+              <option value="sms">SMS</option>
+              <option value="social">Social</option>
+              <option value="cms">CMS</option>
+              <option value="payment">Payment</option>
+              <option value="other">Other</option>
+            </select>
+            <select id="limitFilter">
+              <option value="10">10 results</option>
+              <option value="25">25 results</option>
+              <option value="50">50 results</option>
+            </select>
+          </div>
+          <div class="results-container" id="resultsContainer">
+            <div class="empty-state">
+              <h3>Start Searching</h3>
+              <p>Enter a search query above to find your environment variables</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Tab -->
+      <div class="tab-content" id="addTab">
+        <div class="add-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Variable Name *</label>
+              <input type="text" id="addName" placeholder="e.g., STRIPE_SECRET_KEY" />
+            </div>
+            <div class="form-group">
+              <label>Service *</label>
+              <input type="text" id="addService" placeholder="e.g., Stripe" />
+            </div>
+            <div class="form-group full-width">
+              <label>Description *</label>
+              <textarea id="addDescription" placeholder="What is this variable used for?"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <select id="addCategory">
+                <option value="other">Other</option>
+                <option value="ai_services">AI Services</option>
+                <option value="browser_automation">Browser Automation</option>
+                <option value="database">Database</option>
+                <option value="monitoring">Monitoring</option>
+                <option value="deployment">Deployment</option>
+                <option value="auth">Authentication</option>
+                <option value="analytics">Analytics</option>
+                <option value="storage">Storage</option>
+                <option value="email">Email</option>
+                <option value="sms">SMS</option>
+                <option value="social">Social</option>
+                <option value="cms">CMS</option>
+                <option value="payment">Payment</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Example Value</label>
+              <input type="text" id="addExample" placeholder="e.g., sk_live_xxx (will be sanitized)" />
+            </div>
+            <div class="form-group">
+              <label>Required?</label>
+              <select id="addRequired">
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-secondary" onclick="clearAddForm()">Clear</button>
+            <button class="btn btn-primary" onclick="addVariable()">Add Variable</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Import Tab -->
+      <div class="tab-content" id="importTab">
+        <div class="import-panel">
+          <textarea class="import-textarea" id="importText" placeholder="# Paste your .env file content here...
+# Comments are preserved as descriptions
+
+OPENAI_API_KEY=sk-...
+STRIPE_SECRET_KEY=sk_live_...
+# Database connection string
+DATABASE_URL=postgres://..."></textarea>
+          <div class="import-options">
+            <label>
+              <input type="checkbox" id="clearExisting" />
+              Clear existing variables before import
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-secondary" onclick="document.getElementById('importText').value = ''">Clear</button>
+            <button class="btn btn-primary" onclick="importEnvVars()">Import Variables</button>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -229,27 +748,27 @@
       <h2>Why EnvMem?</h2>
       <div class="features-grid">
         <div class="feature-card">
-          <h3>Semantic Search</h3>
+          <h3>🔍 Semantic Search</h3>
           <p>Natural language queries powered by Cloudflare Vectorize. Ask "email sending" and find SendGrid, Mailjet, Brevo configs.</p>
         </div>
         <div class="feature-card">
-          <h3>Multi-Tenant Isolation</h3>
+          <h3>🔐 Multi-Tenant Isolation</h3>
           <p>Each API key gets completely isolated storage. Your secrets never mix with others.</p>
         </div>
         <div class="feature-card">
-          <h3>MCP Protocol</h3>
+          <h3>🤖 MCP Protocol</h3>
           <p>Works with Claude, ChatGPT, and any MCP-compatible AI assistant. Import once, search everywhere.</p>
         </div>
         <div class="feature-card">
-          <h3>Import from .env</h3>
+          <h3>📥 Import from .env</h3>
           <p>Paste your entire .env file. We parse, categorize, and index automatically with AI-powered inference.</p>
         </div>
         <div class="feature-card">
-          <h3>Service Bundles</h3>
+          <h3>📦 Service Bundles</h3>
           <p>Setting up a new project? Get all env vars for Stripe + Supabase + SendGrid in one query.</p>
         </div>
         <div class="feature-card">
-          <h3>Edge-Native</h3>
+          <h3>⚡ Edge-Native</h3>
           <p>Runs on Cloudflare Workers globally. Sub-50ms responses from 300+ locations.</p>
         </div>
       </div>
@@ -260,28 +779,34 @@
     <div class="container">
       <h2>Quick Start</h2>
       <div class="code-block">
-<pre><span class="comment"># Add to your MCP config (Claude Desktop, etc.)</span>
+<pre><span class="comment"># Option 1: NPX (Recommended)</span>
+ENVMEM_API_KEY=your-key npx envmem
+
+<span class="comment"># Option 2: Claude Desktop / Claude Code config</span>
 {
   <span class="key">"mcpServers"</span>: {
     <span class="key">"envmem"</span>: {
-      <span class="key">"url"</span>: <span class="string">"https://envmem.dev/mcp"</span>,
-      <span class="key">"headers"</span>: {
-        <span class="key">"x-api-key"</span>: <span class="string">"your-api-key-here"</span>
+      <span class="key">"command"</span>: <span class="string">"npx"</span>,
+      <span class="key">"args"</span>: [<span class="string">"-y"</span>, <span class="string">"envmem"</span>],
+      <span class="key">"env"</span>: {
+        <span class="key">"ENVMEM_API_KEY"</span>: <span class="string">"your-api-key"</span>
       }
     }
   }
 }
 
-<span class="comment"># Or use with Smithery</span>
-npx @anthropic/smithery install envmem
+<span class="comment"># Option 3: Direct URL with API key</span>
+{
+  <span class="key">"mcpServers"</span>: {
+    <span class="key">"envmem"</span>: {
+      <span class="key">"url"</span>: <span class="string">"https://envmem.trigox.workers.dev/mcp?apikey=your-key"</span>
+    }
+  }
+}
 
 <span class="comment"># Import your .env file</span>
 <span class="key">import_env_variables</span>({
-  <span class="key">envText</span>: <span class="string">`
-    OPENAI_API_KEY=sk-...
-    STRIPE_SECRET_KEY=sk_live_...
-    SUPABASE_URL=https://...
-  `</span>
+  <span class="key">envText</span>: <span class="string">"OPENAI_API_KEY=sk-...\nSTRIPE_SECRET_KEY=sk_live_..."</span>
 })
 
 <span class="comment"># Then search naturally</span>
@@ -291,34 +816,276 @@ npx @anthropic/smithery install envmem
     </div>
   </section>
 
-  <section class="pricing" id="pricing">
-    <div class="container">
-      <h2>Simple Pricing</h2>
-      <p class="subtitle">Free forever for personal use</p>
-      <div class="price-card">
-        <h3>Free Tier</h3>
-        <div class="price">$0<span>/month</span></div>
-        <ul class="price-features">
-          <li>Unlimited env variables</li>
-          <li>Semantic search</li>
-          <li>Multi-tenant isolation</li>
-          <li>MCP protocol support</li>
-          <li>API key authentication</li>
-          <li>Global edge deployment</li>
-        </ul>
-        <a href="#usage" class="btn btn-primary" style="width: 100%;">Get Started Free</a>
-      </div>
-    </div>
-  </section>
-
   <footer>
     <div class="container">
       <p>Built with Cloudflare Workers, Vectorize, and D1</p>
       <p style="margin-top: 8px;">
-        <a href="https://github.com/anthropics/claude-code">Open Source</a> · 
+        <a href="https://github.com/samihalawa/envmem-mcp">Open Source</a> ·
+        <a href="https://www.npmjs.com/package/envmem">npm</a> ·
         Made for developers who forget their env var names
       </p>
     </div>
   </footer>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    const API_BASE = '';  // Same origin
+    let currentApiKey = '';
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedKey = localStorage.getItem('envmem_api_key');
+      if (savedKey) {
+        document.getElementById('apiKeyInput').value = savedKey;
+        connectWithApiKey();
+      }
+    });
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    function generateApiKey() {
+      const array = new Uint8Array(16);
+      crypto.getRandomValues(array);
+      const key = Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+      document.getElementById('apiKeyInput').value = key;
+      showToast('API key generated! Click Connect to use it.', 'info');
+    }
+
+    async function connectWithApiKey() {
+      const apiKey = document.getElementById('apiKeyInput').value.trim();
+      if (!apiKey) {
+        showToast('Please enter an API key', 'error');
+        return;
+      }
+
+      currentApiKey = apiKey;
+      localStorage.setItem('envmem_api_key', apiKey);
+
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+      statusDot.className = 'status-dot checking';
+      statusText.textContent = 'Connecting...';
+
+      try {
+        const response = await fetch(`${API_BASE}/health?apikey=${encodeURIComponent(apiKey)}`);
+        const data = await response.json();
+
+        if (data.status === 'healthy') {
+          statusDot.className = 'status-dot connected';
+          statusText.textContent = `Connected as ${data.userId || 'user'}`;
+
+          // Show stats
+          const statsGrid = document.getElementById('statsGrid');
+          statsGrid.style.display = 'grid';
+          document.getElementById('totalVars').textContent = data.stats?.total || 0;
+          document.getElementById('totalServices').textContent = Object.keys(data.stats?.byService || {}).length;
+          document.getElementById('totalCategories').textContent = Object.keys(data.stats?.byCategory || {}).length;
+
+          showToast('Connected successfully!', 'success');
+        } else {
+          throw new Error('Unhealthy response');
+        }
+      } catch (error) {
+        statusDot.className = 'status-dot disconnected';
+        statusText.textContent = 'Connection failed';
+        showToast('Failed to connect. Check your API key.', 'error');
+      }
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+      event.target.classList.add('active');
+      document.getElementById(tabName + 'Tab').classList.add('active');
+    }
+
+    function handleSearchKeyup(event) {
+      if (event.key === 'Enter') {
+        performSearch();
+      }
+    }
+
+    async function performSearch() {
+      const query = document.getElementById('searchInput').value.trim();
+      if (!query) {
+        showToast('Please enter a search query', 'error');
+        return;
+      }
+
+      if (!currentApiKey) {
+        showToast('Please connect with an API key first', 'error');
+        return;
+      }
+
+      const category = document.getElementById('categoryFilter').value;
+      const limit = document.getElementById('limitFilter').value;
+      const container = document.getElementById('resultsContainer');
+
+      container.innerHTML = '<div class="loading-overlay"><div class="spinner"></div><span>Searching...</span></div>';
+
+      try {
+        let url = `${API_BASE}/search?q=${encodeURIComponent(query)}&apikey=${encodeURIComponent(currentApiKey)}&limit=${limit}`;
+        if (category) url += `&category=${category}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.results && data.results.length > 0) {
+          container.innerHTML = `
+            <div class="results-header">
+              <span>Found ${data.results.length} result${data.results.length > 1 ? 's' : ''}</span>
+              <span>Query: "${data.query}"</span>
+            </div>
+            ${data.results.map(r => `
+              <div class="result-card">
+                <div class="result-header">
+                  <span class="result-name">${escapeHtml(r.env?.name || r.name || 'Unknown')}</span>
+                  ${r.score ? `<span class="result-score">${(r.score * 100).toFixed(0)}% match</span>` : ''}
+                </div>
+                <p class="result-description">${escapeHtml(r.env?.description || r.description || 'No description')}</p>
+                <div class="result-meta">
+                  ${r.env?.category || r.category ? `<span class="badge badge-category">${r.env?.category || r.category}</span>` : ''}
+                  ${r.env?.service || r.service ? `<span class="badge badge-service">${r.env?.service || r.service}</span>` : ''}
+                  ${(r.env?.required || r.required) ? '<span class="badge badge-required">Required</span>' : ''}
+                </div>
+              </div>
+            `).join('')}
+          `;
+        } else {
+          container.innerHTML = `
+            <div class="empty-state">
+              <h3>No Results Found</h3>
+              <p>Try a different search query or import some environment variables first</p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <h3>Search Failed</h3>
+            <p>${escapeHtml(error.message)}</p>
+          </div>
+        `;
+        showToast('Search failed: ' + error.message, 'error');
+      }
+    }
+
+    async function addVariable() {
+      if (!currentApiKey) {
+        showToast('Please connect with an API key first', 'error');
+        return;
+      }
+
+      const name = document.getElementById('addName').value.trim();
+      const service = document.getElementById('addService').value.trim();
+      const description = document.getElementById('addDescription').value.trim();
+      const category = document.getElementById('addCategory').value;
+      const example = document.getElementById('addExample').value.trim();
+      const required = document.getElementById('addRequired').value === 'true';
+
+      if (!name || !service || !description) {
+        showToast('Please fill in all required fields', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/mcp?apikey=${encodeURIComponent(currentApiKey)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'tools/call',
+            params: {
+              name: 'add_env_variable',
+              arguments: { name, service, description, category, example, required }
+            }
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.result) {
+          showToast('Variable added successfully!', 'success');
+          clearAddForm();
+          connectWithApiKey(); // Refresh stats
+        } else if (data.error) {
+          throw new Error(data.error.message || 'Unknown error');
+        }
+      } catch (error) {
+        showToast('Failed to add variable: ' + error.message, 'error');
+      }
+    }
+
+    function clearAddForm() {
+      document.getElementById('addName').value = '';
+      document.getElementById('addService').value = '';
+      document.getElementById('addDescription').value = '';
+      document.getElementById('addCategory').value = 'other';
+      document.getElementById('addExample').value = '';
+      document.getElementById('addRequired').value = 'false';
+    }
+
+    async function importEnvVars() {
+      if (!currentApiKey) {
+        showToast('Please connect with an API key first', 'error');
+        return;
+      }
+
+      const envText = document.getElementById('importText').value.trim();
+      const clearExisting = document.getElementById('clearExisting').checked;
+
+      if (!envText) {
+        showToast('Please paste some .env content', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/mcp?apikey=${encodeURIComponent(currentApiKey)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'tools/call',
+            params: {
+              name: 'import_env_variables',
+              arguments: { envText, clearExisting }
+            }
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.result) {
+          const content = data.result.content?.[0]?.text || 'Import completed';
+          showToast(content, 'success');
+          document.getElementById('importText').value = '';
+          document.getElementById('clearExisting').checked = false;
+          connectWithApiKey(); // Refresh stats
+        } else if (data.error) {
+          throw new Error(data.error.message || 'Unknown error');
+        }
+      } catch (error) {
+        showToast('Import failed: ' + error.message, 'error');
+      }
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
 </body>
 </html>
