@@ -46,6 +46,41 @@ export interface EnvVariable {
 }
 
 /**
+ * Project for organizing env variables
+ */
+export interface Project {
+  id?: number;
+  userId?: string;
+  name: string;
+  repoUrl?: string;
+  tags: string[];
+  description?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+/**
+ * Link between env variable and project with environment support
+ */
+export interface EnvProjectLink {
+  id?: number;
+  envVariableId: number;
+  projectId: number;
+  environment: 'dev' | 'staging' | 'prod' | 'default';
+  valueOverride?: string;
+  createdAt?: number;
+}
+
+/**
+ * Env variable with project context
+ */
+export interface EnvWithProject extends EnvVariable {
+  projectName?: string;
+  environment?: string;
+  valueOverride?: string;
+}
+
+/**
  * Search result with scoring
  */
 export interface SearchResult {

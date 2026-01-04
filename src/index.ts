@@ -147,7 +147,7 @@ export default {
         return new Response(JSON.stringify({
           status: 'healthy',
           service: 'envmem',
-          version: '1.1.0',
+          version: '1.2.0',
           userId: auth.userId,
           authenticated: auth.userId !== 'anonymous',
           stats,
@@ -162,7 +162,7 @@ export default {
 
         return new Response(JSON.stringify({
           name: 'envmem',
-          version: '1.1.0',
+          version: '1.2.0',
           description: 'Personal environment variable memory with semantic search',
           endpoints: {
             mcp: '/mcp',
@@ -358,6 +358,156 @@ const MCP_TOOLS = [
       required: ['confirm'],
     },
   },
+  // ==================== PROJECT MANAGEMENT TOOLS ====================
+  {
+    name: 'create_project',
+    description: 'Create a project to organize environment variables. Projects can be linked to repos and tagged.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Project name (e.g., "my-saas-app", "autoclient")',
+        },
+        repoUrl: {
+          type: 'string',
+          description: 'Optional: GitHub/GitLab repo URL',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional: Tags for categorization (e.g., ["saas", "nextjs", "stripe"])',
+        },
+        description: {
+          type: 'string',
+          description: 'Optional: Project description',
+        },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'list_projects',
+    description: 'List all your projects',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'link_env_to_project',
+    description: 'Link an environment variable to a project. Optionally specify environment (dev/staging/prod) and override value.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        envName: {
+          type: 'string',
+          description: 'Environment variable name (e.g., "STRIPE_SECRET_KEY")',
+        },
+        projectName: {
+          type: 'string',
+          description: 'Project name to link to',
+        },
+        environment: {
+          type: 'string',
+          enum: ['dev', 'staging', 'prod', 'default'],
+          default: 'default',
+          description: 'Environment (dev/staging/prod/default)',
+        },
+        valueOverride: {
+          type: 'string',
+          description: 'Optional: Different value for this project/environment combo',
+        },
+      },
+      required: ['envName', 'projectName'],
+    },
+  },
+  {
+    name: 'link_services_to_project',
+    description: 'Bulk link all envs from multiple services to a project. Use when setting up a new project that uses Stripe, Supabase, etc.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectName: {
+          type: 'string',
+          description: 'Project name',
+        },
+        services: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of services (e.g., ["Stripe", "Supabase", "OpenAI"])',
+        },
+        environment: {
+          type: 'string',
+          enum: ['dev', 'staging', 'prod', 'default'],
+          default: 'default',
+          description: 'Environment to link to',
+        },
+      },
+      required: ['projectName', 'services'],
+    },
+  },
+  {
+    name: 'get_envs_for_project',
+    description: 'Get all environment variables for a project, optionally filtered by environment. Returns ready-to-use .env content.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectName: {
+          type: 'string',
+          description: 'Project name',
+        },
+        environment: {
+          type: 'string',
+          enum: ['dev', 'staging', 'prod', 'default'],
+          description: 'Optional: Filter by environment',
+        },
+        format: {
+          type: 'string',
+          enum: ['json', 'env', 'env_minimal'],
+          default: 'env',
+          description: 'Output format: json (structured), env (with comments), env_minimal (no comments)',
+        },
+      },
+      required: ['projectName'],
+    },
+  },
+  {
+    name: 'fill_env_example',
+    description: 'Parse a .env.example file and fill it with your stored values. Auto-links matched envs to the project.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        envExampleContent: {
+          type: 'string',
+          description: 'Content of your .env.example file',
+        },
+        projectName: {
+          type: 'string',
+          description: 'Project name (will be created if not exists)',
+        },
+      },
+      required: ['envExampleContent', 'projectName'],
+    },
+  },
+  {
+    name: 'delete_project',
+    description: 'Delete a project and all its env links (does NOT delete the env variables themselves)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectName: {
+          type: 'string',
+          description: 'Project name to delete',
+        },
+        confirm: {
+          type: 'boolean',
+          description: 'Must be true to confirm deletion',
+        },
+      },
+      required: ['projectName', 'confirm'],
+    },
+  },
 ];
 
 /**
@@ -394,9 +544,9 @@ async function handleJsonRpcRequest(
         },
         serverInfo: {
           name: 'envmem',
-          version: '1.1.0',
+          version: '1.2.0',
         },
-        instructions: `EnvMem - Personal environment variable memory. Semantic search for YOUR env vars.
+        instructions: `EnvMem v1.2 - Personal environment variable memory with project management.
 
 AUTHENTICATION:
 - Pass API key via x-api-key header, Bearer token, or ?api_key= query param
@@ -404,22 +554,31 @@ AUTHENTICATION:
 - No API key = anonymous (shared) storage
 
 FIRST TIME SETUP:
-1. Import your .env file: import_env_variables(envText="<your .env content>", clearExisting=true)
+1. Import your .env file: import_env_variables(envText="<your .env content>")
 2. Or add one at a time: add_env_variable(name, description, service, ...)
 
-SEARCHING (after you've imported):
-1. search_env_variables: Natural language search (e.g., "email sending", "AI API")
-2. get_env_by_name: Get details for specific var (e.g., "STRIPE_SECRET_KEY")
-3. get_envs_for_services: Get all vars for services (e.g., ["Stripe","OpenAI"])
-4. list_env_categories: Browse all categories and counts
+SEARCHING:
+- search_env_variables: Natural language search (e.g., "email sending", "AI API")
+- get_env_by_name: Get details for specific var (e.g., "STRIPE_SECRET_KEY")
+- get_envs_for_services: Get all vars for services (e.g., ["Stripe","OpenAI"])
+- list_env_categories: Browse all categories and counts
 
-MANAGEMENT:
-- import_env_variables: Bulk import from .env text
-- add_env_variable: Add a single variable
-- delete_env_variable: Remove by name
-- clear_all_env_variables: Delete all (requires confirm=true)
+PROJECT MANAGEMENT (NEW!):
+- create_project: Create a project to organize envs (with optional repo URL and tags)
+- list_projects: List all your projects
+- link_env_to_project: Link an env var to a project (with dev/staging/prod support)
+- link_services_to_project: Bulk link all envs from services to a project
+- get_envs_for_project: Get all envs for a project as ready-to-use .env file
+- fill_env_example: Parse .env.example and fill with your stored values
+- delete_project: Delete a project and its links
 
-NOTE: Your data is isolated by API key. Get your key at envmem.dev`,
+TYPICAL WORKFLOW:
+1. Import your envs once: import_env_variables(envText="...")
+2. Create project: create_project(name="my-app", repoUrl="github.com/me/my-app")
+3. Link services: link_services_to_project(projectName="my-app", services=["Stripe","Supabase"])
+4. Get .env file: get_envs_for_project(projectName="my-app", environment="prod")
+
+OR use fill_env_example to auto-fill from .env.example!`,
       });
     }
 
@@ -652,6 +811,181 @@ NOTE: Your data is isolated by API key. Get your key at envmem.dev`,
               success: true,
               message: `Deleted ${result.deleted} environment variables`,
               deleted: result.deleted,
+            }, null, 2),
+          }],
+        });
+      }
+
+      // ==================== PROJECT MANAGEMENT TOOLS ====================
+
+      if (toolName === 'create_project') {
+        const result = await store.createProject({
+          name: args.name as string,
+          repoUrl: args.repoUrl as string | undefined,
+          tags: (args.tags as string[]) || [],
+          description: args.description as string | undefined,
+          userId: undefined, // Set by store based on auth
+        });
+
+        return success({
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              message: `Created project: ${args.name}`,
+              projectId: result.id,
+            }, null, 2),
+          }],
+        });
+      }
+
+      if (toolName === 'list_projects') {
+        const projects = await store.listProjects();
+
+        return success({
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              count: projects.length,
+              projects: projects.map(p => ({
+                name: p.name,
+                repoUrl: p.repoUrl,
+                tags: p.tags,
+                description: p.description,
+              })),
+            }, null, 2),
+          }],
+        });
+      }
+
+      if (toolName === 'link_env_to_project') {
+        const result = await store.linkEnvToProject(
+          args.envName as string,
+          args.projectName as string,
+          (args.environment as 'dev' | 'staging' | 'prod' | 'default') || 'default',
+          args.valueOverride as string | undefined
+        );
+
+        return success({
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: result.success,
+              message: result.success
+                ? `Linked ${args.envName} to ${args.projectName} (${args.environment || 'default'})`
+                : `Failed to link - env variable "${args.envName}" not found`,
+              linkId: result.linkId,
+            }, null, 2),
+          }],
+        });
+      }
+
+      if (toolName === 'link_services_to_project') {
+        const result = await store.linkServiceEnvsToProject(
+          args.projectName as string,
+          args.services as string[],
+          (args.environment as 'dev' | 'staging' | 'prod' | 'default') || 'default'
+        );
+
+        return success({
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              message: `Linked ${result.linked} env variables to ${args.projectName}`,
+              linked: result.linked,
+              byService: result.services,
+            }, null, 2),
+          }],
+        });
+      }
+
+      if (toolName === 'get_envs_for_project') {
+        const format = (args.format as string) || 'env';
+        const environment = args.environment as 'dev' | 'staging' | 'prod' | 'default' | undefined;
+
+        if (format === 'json') {
+          const envs = await store.getEnvsForProject(args.projectName as string, environment);
+
+          return success({
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                project: args.projectName,
+                environment: environment || 'all',
+                count: envs.length,
+                envs: envs.map(e => ({
+                  name: e.name,
+                  value: e.valueOverride || e.example || '',
+                  service: e.service,
+                  required: e.required,
+                  environment: e.environment,
+                })),
+              }, null, 2),
+            }],
+          });
+        }
+
+        // Generate .env file format
+        const includeComments = format !== 'env_minimal';
+        const envFile = await store.generateEnvFile(
+          args.projectName as string,
+          environment || 'default',
+          includeComments
+        );
+
+        return success({
+          content: [{
+            type: 'text',
+            text: envFile,
+          }],
+        });
+      }
+
+      if (toolName === 'fill_env_example') {
+        const result = await store.matchEnvExample(
+          args.envExampleContent as string,
+          args.projectName as string
+        );
+
+        return success({
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              project: args.projectName,
+              matched: result.matched.length,
+              missing: result.missing,
+              matchedVars: result.matched.map(e => e.name),
+              missingVars: result.missing,
+              filledTemplate: result.template,
+            }, null, 2),
+          }],
+        });
+      }
+
+      if (toolName === 'delete_project') {
+        if (!args.confirm) {
+          return success({
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                message: 'Deletion cancelled. Set confirm=true to delete.',
+              }, null, 2),
+            }],
+          });
+        }
+
+        const deleted = await store.deleteProject(args.projectName as string);
+
+        return success({
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: deleted,
+              message: deleted
+                ? `Deleted project: ${args.projectName}`
+                : `Project not found: ${args.projectName}`,
             }, null, 2),
           }],
         });

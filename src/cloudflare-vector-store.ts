@@ -1,4 +1,4 @@
-import type { Env, EnvVariable, SearchResult, SearchOptions, AuthContext } from './types';
+import type { Env, EnvVariable, SearchResult, SearchOptions, AuthContext, Project, EnvProjectLink, EnvWithProject } from './types';
 
 /**
  * Vector store using Cloudflare Vectorize and D1
@@ -890,5 +890,333 @@ export class CloudflareVectorStore {
     });
 
     return Array.from(words).slice(0, 10);
+  }
+
+  // ==================== PROJECT MANAGEMENT ====================
+
+  /**
+   * Check if projects table exists
+   */
+  private async checkProjectsEnabled(): Promise<boolean> {
+    try {
+      await this.env.DB.prepare("SELECT id FROM projects LIMIT 1").first();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Create or update a project
+   */
+  async createProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<{ id: number }> {
+    const result = await this.env.DB.prepare(`
+      INSERT INTO projects (user_id, name, repo_url, tags, description)
+      VALUES (?1, ?2, ?3, ?4, ?5)
+      ON CONFLICT(user_id, name) DO UPDATE SET
+        repo_url = excluded.repo_url,
+        tags = excluded.tags,
+        description = excluded.description,
+        updated_at = strftime('%s', 'now')
+      RETURNING id
+    `).bind(
+      this.userId,
+      project.name,
+      project.repoUrl || null,
+      JSON.stringify(project.tags || []),
+      project.description || null
+    ).first<{ id: number }>();
+
+    if (!result) throw new Error('Failed to create project');
+    return { id: result.id };
+  }
+
+  /**
+   * Get project by name
+   */
+  async getProjectByName(name: string): Promise<Project | null> {
+    const row = await this.env.DB.prepare(
+      'SELECT * FROM projects WHERE user_id = ? AND name = ?'
+    ).bind(this.userId, name).first<any>();
+
+    return row ? this.rowToProject(row) : null;
+  }
+
+  /**
+   * Get project by repo URL
+   */
+  async getProjectByRepo(repoUrl: string): Promise<Project | null> {
+    const row = await this.env.DB.prepare(
+      'SELECT * FROM projects WHERE user_id = ? AND repo_url = ?'
+    ).bind(this.userId, repoUrl).first<any>();
+
+    return row ? this.rowToProject(row) : null;
+  }
+
+  /**
+   * List all projects for user
+   */
+  async listProjects(): Promise<Project[]> {
+    const { results } = await this.env.DB.prepare(
+      'SELECT * FROM projects WHERE user_id = ? ORDER BY name'
+    ).bind(this.userId).all<any>();
+
+    return results.map(this.rowToProject);
+  }
+
+  /**
+   * Link an env variable to a project with optional environment
+   */
+  async linkEnvToProject(
+    envName: string,
+    projectName: string,
+    environment: EnvProjectLink['environment'] = 'default',
+    valueOverride?: string
+  ): Promise<{ success: boolean; linkId?: number }> {
+    // Get env variable
+    const envVar = await this.getByName(envName);
+    if (!envVar?.id) return { success: false };
+
+    // Get or create project
+    let project = await this.getProjectByName(projectName);
+    if (!project) {
+      const { id } = await this.createProject({ name: projectName, tags: [], userId: this.userId });
+      project = { id, name: projectName, tags: [], userId: this.userId };
+    }
+
+    // Create link
+    const result = await this.env.DB.prepare(`
+      INSERT INTO env_project_links (env_variable_id, project_id, environment, value_override)
+      VALUES (?1, ?2, ?3, ?4)
+      ON CONFLICT(env_variable_id, project_id, environment) DO UPDATE SET
+        value_override = excluded.value_override
+      RETURNING id
+    `).bind(
+      envVar.id,
+      project.id,
+      environment,
+      valueOverride || null
+    ).first<{ id: number }>();
+
+    return { success: !!result, linkId: result?.id };
+  }
+
+  /**
+   * Get all env variables for a project, optionally filtered by environment
+   */
+  async getEnvsForProject(
+    projectName: string,
+    environment?: EnvProjectLink['environment']
+  ): Promise<EnvWithProject[]> {
+    const project = await this.getProjectByName(projectName);
+    if (!project?.id) return [];
+
+    let sql = `
+      SELECT ev.*, epl.environment, epl.value_override
+      FROM env_variables ev
+      JOIN env_project_links epl ON ev.id = epl.env_variable_id
+      WHERE epl.project_id = ? AND ev.user_id = ?
+    `;
+    const params: any[] = [project.id, this.userId];
+
+    if (environment) {
+      sql += ' AND epl.environment = ?';
+      params.push(environment);
+    }
+
+    sql += ' ORDER BY ev.service, ev.name';
+
+    const { results } = await this.env.DB.prepare(sql).bind(...params).all<any>();
+
+    return results.map(row => ({
+      ...this.rowToEnvVariable(row),
+      projectName,
+      environment: row.environment,
+      valueOverride: row.value_override,
+    }));
+  }
+
+  /**
+   * Generate a complete .env file for a project
+   */
+  async generateEnvFile(
+    projectName: string,
+    environment: EnvProjectLink['environment'] = 'default',
+    includeComments: boolean = true
+  ): Promise<string> {
+    const envs = await this.getEnvsForProject(projectName, environment);
+
+    if (envs.length === 0) {
+      // Try to get envs for default environment if specific env has none
+      if (environment !== 'default') {
+        const defaultEnvs = await this.getEnvsForProject(projectName, 'default');
+        if (defaultEnvs.length > 0) {
+          return this.formatEnvFile(defaultEnvs, projectName, environment, includeComments);
+        }
+      }
+      return `# No environment variables found for project: ${projectName}\n# Use link_env_to_project to add envs to this project\n`;
+    }
+
+    return this.formatEnvFile(envs, projectName, environment, includeComments);
+  }
+
+  /**
+   * Format env variables as .env file content
+   */
+  private formatEnvFile(
+    envs: EnvWithProject[],
+    projectName: string,
+    environment: string,
+    includeComments: boolean
+  ): string {
+    let output = '';
+
+    if (includeComments) {
+      output += `# ================================================\n`;
+      output += `# ${projectName} - ${environment} environment\n`;
+      output += `# Generated by EnvMem at ${new Date().toISOString()}\n`;
+      output += `# ================================================\n\n`;
+    }
+
+    // Group by service
+    const byService = new Map<string, EnvWithProject[]>();
+    for (const env of envs) {
+      const service = env.service || 'Other';
+      if (!byService.has(service)) byService.set(service, []);
+      byService.get(service)!.push(env);
+    }
+
+    for (const [service, serviceEnvs] of byService) {
+      if (includeComments) {
+        output += `# ======= ${service} =======\n`;
+      }
+
+      for (const env of serviceEnvs) {
+        if (includeComments && env.description) {
+          output += `# ${env.description}\n`;
+        }
+        // Use value override if present, otherwise use example
+        const value = env.valueOverride || env.example || '';
+        const prefix = env.required ? '' : '# ';
+        output += `${prefix}${env.name}=${value}\n`;
+      }
+      output += '\n';
+    }
+
+    return output;
+  }
+
+  /**
+   * Parse .env.example and match with stored env variables
+   */
+  async matchEnvExample(
+    envExampleText: string,
+    projectName: string
+  ): Promise<{ matched: EnvVariable[]; missing: string[]; template: string }> {
+    // Parse the .env.example to get variable names
+    const lines = envExampleText.split('\n');
+    const varNames: string[] = [];
+
+    for (const line of lines) {
+      const match = line.trim().match(/^([A-Z][A-Z0-9_]*)=/);
+      if (match) varNames.push(match[1]);
+    }
+
+    const matched: EnvVariable[] = [];
+    const missing: string[] = [];
+
+    // Try to find each variable in the store
+    for (const name of varNames) {
+      const envVar = await this.getByName(name);
+      if (envVar) {
+        matched.push(envVar);
+        // Auto-link to project
+        await this.linkEnvToProject(name, projectName, 'default');
+      } else {
+        missing.push(name);
+      }
+    }
+
+    // Generate template with filled values
+    let template = '';
+    for (const line of lines) {
+      const match = line.trim().match(/^([A-Z][A-Z0-9_]*)=(.*)/);
+      if (match) {
+        const [, name, originalValue] = match;
+        const envVar = matched.find(e => e.name === name);
+        if (envVar?.example) {
+          template += `${name}=${envVar.example}\n`;
+        } else {
+          template += `${name}=${originalValue}\n`;
+        }
+      } else {
+        template += line + '\n';
+      }
+    }
+
+    return { matched, missing, template };
+  }
+
+  /**
+   * Bulk link envs to project by service names
+   */
+  async linkServiceEnvsToProject(
+    projectName: string,
+    services: string[],
+    environment: EnvProjectLink['environment'] = 'default'
+  ): Promise<{ linked: number; services: Record<string, number> }> {
+    let totalLinked = 0;
+    const serviceStats: Record<string, number> = {};
+
+    for (const service of services) {
+      const envVars = await this.getByService(service, true);
+      serviceStats[service] = 0;
+
+      for (const env of envVars) {
+        const result = await this.linkEnvToProject(env.name, projectName, environment);
+        if (result.success) {
+          totalLinked++;
+          serviceStats[service]++;
+        }
+      }
+    }
+
+    return { linked: totalLinked, services: serviceStats };
+  }
+
+  /**
+   * Delete project and all its links
+   */
+  async deleteProject(projectName: string): Promise<boolean> {
+    const project = await this.getProjectByName(projectName);
+    if (!project?.id) return false;
+
+    // Delete links first
+    await this.env.DB.prepare(
+      'DELETE FROM env_project_links WHERE project_id = ?'
+    ).bind(project.id).run();
+
+    // Delete project
+    await this.env.DB.prepare(
+      'DELETE FROM projects WHERE id = ?'
+    ).bind(project.id).run();
+
+    return true;
+  }
+
+  /**
+   * Convert row to Project
+   */
+  private rowToProject(row: any): Project {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      name: row.name,
+      repoUrl: row.repo_url,
+      tags: row.tags ? JSON.parse(row.tags) : [],
+      description: row.description,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
   }
 }
