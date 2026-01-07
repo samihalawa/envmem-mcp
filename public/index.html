@@ -11,7 +11,7 @@
       --surface: #12121a;
       --border: #1e1e2e;
       --text: #e4e4e7;
-      --text-muted: #71717a;
+      --text-muted: #a1a1aa;
       --accent: #8b5cf6;
       --accent-hover: #a78bfa;
       --success: #22c55e;
@@ -32,6 +32,11 @@
     header {
       padding: 20px 0;
       border-bottom: 1px solid var(--border);
+      background: rgba(10, 10, 15, 0.8);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
     .header-content {
       display: flex;
@@ -43,6 +48,9 @@
       font-weight: 700;
       color: var(--accent);
       text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
     .logo span { color: var(--text); }
     nav a {
@@ -50,21 +58,37 @@
       text-decoration: none;
       margin-left: 24px;
       transition: color 0.2s;
+      font-size: 15px;
     }
     nav a:hover { color: var(--text); }
 
     /* Hero */
     .hero {
-      padding: 60px 0;
+      padding: 80px 0 60px;
       text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1000px;
+      height: 1000px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none;
+      z-index: -1;
     }
     .hero h1 {
-      font-size: 48px;
+      font-size: 56px;
       font-weight: 800;
       margin-bottom: 24px;
-      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+      background: linear-gradient(135deg, #fff 0%, #a78bfa 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      line-height: 1.1;
     }
     .hero p {
       font-size: 20px;
@@ -77,6 +101,7 @@
       gap: 16px;
       justify-content: center;
       flex-wrap: wrap;
+      margin-bottom: 60px;
     }
     .btn {
       padding: 14px 28px;
@@ -87,32 +112,47 @@
       transition: all 0.2s;
       cursor: pointer;
       border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
     .btn-primary {
       background: var(--accent);
       color: white;
+      box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
     }
-    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-2px); }
     .btn-secondary {
-      background: var(--surface);
+      background: rgba(255, 255, 255, 0.05);
       color: var(--text);
       border: 1px solid var(--border);
     }
-    .btn-secondary:hover { border-color: var(--accent); }
+    .btn-secondary:hover { border-color: var(--accent); background: rgba(255, 255, 255, 0.1); }
     .btn-sm {
       padding: 8px 16px;
       font-size: 14px;
     }
-    .btn-danger {
-      background: var(--error);
-      color: white;
+
+    .hero-image {
+      max-width: 1000px;
+      margin: 0 auto;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      overflow: hidden;
     }
-    .btn-danger:hover { background: #dc2626; }
+    .hero-image img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
 
     /* Management Section */
     .manage-section {
-      padding: 40px 0 80px;
+      padding: 80px 0;
       background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
     }
     .manage-section h2 {
       text-align: center;
@@ -127,6 +167,9 @@
       border-radius: 12px;
       padding: 20px;
       margin-bottom: 24px;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
     }
     .api-key-bar label {
       display: block;
@@ -177,8 +220,11 @@
       display: flex;
       gap: 8px;
       margin-bottom: 24px;
+      justify-content: center;
       border-bottom: 1px solid var(--border);
       padding-bottom: 12px;
+      max-width: 800px;
+      margin: 0 auto 24px;
     }
     .tab {
       padding: 10px 20px;
@@ -198,6 +244,8 @@
     }
     .tab-content {
       display: none;
+      max-width: 800px;
+      margin: 0 auto;
     }
     .tab-content.active {
       display: block;
@@ -451,6 +499,7 @@
       align-items: center;
       gap: 10px;
       max-width: 400px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
     @keyframes slideIn {
       from { transform: translateX(100%); opacity: 0; }
@@ -479,7 +528,9 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 24px;
+      transition: transform 0.2s;
     }
+    .feature-card:hover { transform: translateY(-5px); }
     .feature-card h3 {
       font-size: 18px;
       margin-bottom: 12px;
@@ -487,10 +538,24 @@
     }
     .feature-card p { color: var(--text-muted); }
 
+    .terminal-showcase {
+      margin-top: 60px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .terminal-showcase img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
     /* Code Example */
     .code-section {
       padding: 80px 0;
       background: var(--surface);
+      border-top: 1px solid var(--border);
     }
     .code-section h2 {
       text-align: center;
@@ -505,6 +570,8 @@
       overflow-x: auto;
       font-family: 'Monaco', 'Menlo', monospace;
       font-size: 14px;
+      max-width: 800px;
+      margin: 0 auto;
     }
     .code-block .comment { color: var(--text-muted); }
     .code-block .string { color: var(--success); }
@@ -516,8 +583,10 @@
       text-align: center;
       color: var(--text-muted);
       border-top: 1px solid var(--border);
+      background: var(--bg);
     }
     footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
 
     /* Loading Spinner */
     .spinner {
@@ -553,7 +622,7 @@
     }
 
     @media (max-width: 768px) {
-      .hero h1 { font-size: 32px; }
+      .hero h1 { font-size: 36px; }
       .hero p { font-size: 16px; }
       .api-key-input-group { flex-direction: column; }
       .search-input-group { flex-direction: column; }
@@ -566,9 +635,9 @@
     <div class="container header-content">
       <a href="/" class="logo">Env<span>Mem</span></a>
       <nav>
-        <a href="#manage">Manage</a>
+        <a href="#manage">Web App</a>
         <a href="#features">Features</a>
-        <a href="#usage">Usage</a>
+        <a href="#usage">CLI</a>
         <a href="https://github.com/samihalawa/envmem-mcp" target="_blank">GitHub</a>
       </nav>
     </div>
@@ -579,15 +648,58 @@
       <h1>Your Environment Variables,<br>Always at Hand</h1>
       <p>Semantic search for your .env files. Multi-tenant MCP server that remembers all your API keys, secrets, and configurations.</p>
       <div class="cta-buttons">
-        <a href="#manage" class="btn btn-primary">Start Managing</a>
-        <a href="https://www.npmjs.com/package/envmem" class="btn btn-secondary">npx envmem</a>
+        <a href="#manage" class="btn btn-primary">Open Web App</a>
+        <a href="https://www.npmjs.com/package/envmem" class="btn btn-secondary">npm i -g envmem</a>
+      </div>
+      
+      <div class="hero-image">
+        <img src="/img/hero.jpg" alt="EnvMem Dashboard Interface">
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="container">
+      <h2>Why EnvMem?</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <h3>🔍 Semantic Search</h3>
+          <p>Natural language queries powered by Cloudflare Vectorize. Ask "email sending" and find SendGrid, Mailjet, Brevo configs.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🔐 Multi-Tenant Isolation</h3>
+          <p>Each API key gets completely isolated storage. Your secrets never mix with others.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🤖 MCP Protocol</h3>
+          <p>Works with Claude, ChatGPT, and any MCP-compatible AI assistant. Import once, search everywhere.</p>
+        </div>
+        <div class="feature-card">
+          <h3>📥 Import from .env</h3>
+          <p>Paste your entire .env file. We parse, categorize, and index automatically with AI-powered inference.</p>
+        </div>
+        <div class="feature-card">
+          <h3>📦 Service Bundles</h3>
+          <p>Setting up a new project? Get all env vars for Stripe + Supabase + SendGrid in one query.</p>
+        </div>
+        <div class="feature-card">
+          <h3>⚡ Edge-Native</h3>
+          <p>Runs on Cloudflare Workers globally. Sub-50ms responses from 300+ locations.</p>
+        </div>
+      </div>
+
+      <div class="terminal-showcase">
+        <img src="/img/terminal.jpg" alt="EnvMem Terminal Interface">
       </div>
     </div>
   </section>
 
   <section class="manage-section" id="manage">
     <div class="container">
-      <h2>Manage Your Environment Variables</h2>
+      <h2>Web Application</h2>
+      <p style="text-align: center; color: var(--text-muted); margin-bottom: 24px;">
+        Manage your variables directly from the browser
+      </p>
 
       <!-- API Key Bar -->
       <div class="api-key-bar">
@@ -743,41 +855,9 @@ DATABASE_URL=postgres://..."></textarea>
     </div>
   </section>
 
-  <section class="features" id="features">
-    <div class="container">
-      <h2>Why EnvMem?</h2>
-      <div class="features-grid">
-        <div class="feature-card">
-          <h3>🔍 Semantic Search</h3>
-          <p>Natural language queries powered by Cloudflare Vectorize. Ask "email sending" and find SendGrid, Mailjet, Brevo configs.</p>
-        </div>
-        <div class="feature-card">
-          <h3>🔐 Multi-Tenant Isolation</h3>
-          <p>Each API key gets completely isolated storage. Your secrets never mix with others.</p>
-        </div>
-        <div class="feature-card">
-          <h3>🤖 MCP Protocol</h3>
-          <p>Works with Claude, ChatGPT, and any MCP-compatible AI assistant. Import once, search everywhere.</p>
-        </div>
-        <div class="feature-card">
-          <h3>📥 Import from .env</h3>
-          <p>Paste your entire .env file. We parse, categorize, and index automatically with AI-powered inference.</p>
-        </div>
-        <div class="feature-card">
-          <h3>📦 Service Bundles</h3>
-          <p>Setting up a new project? Get all env vars for Stripe + Supabase + SendGrid in one query.</p>
-        </div>
-        <div class="feature-card">
-          <h3>⚡ Edge-Native</h3>
-          <p>Runs on Cloudflare Workers globally. Sub-50ms responses from 300+ locations.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <section class="code-section" id="usage">
     <div class="container">
-      <h2>Quick Start</h2>
+      <h2>CLI & MCP Usage</h2>
       <div class="code-block">
 <pre><span class="comment"># Option 1: NPX (Recommended)</span>
 ENVMEM_API_KEY=your-key npx envmem
@@ -799,14 +879,14 @@ ENVMEM_API_KEY=your-key npx envmem
 {
   <span class="key">"mcpServers"</span>: {
     <span class="key">"envmem"</span>: {
-      <span class="key">"url"</span>: <span class="string">"https://envmem.trigox.workers.dev/mcp?apikey=your-key"</span>
+      <span class="key">"url"</span>: <span class="string">"https://envmem.com/mcp?apikey=your-key"</span>
     }
   }
 }
 
 <span class="comment"># Import your .env file</span>
 <span class="key">import_env_variables</span>({
-  <span class="key">envText</span>: <span class="string">"OPENAI_API_KEY=sk-...\nSTRIPE_SECRET_KEY=sk_live_..."</span>
+  <span class="key">envText</span>: <span class="string">"OPENAI_API_KEY=sk-...!\nSTRIPE_SECRET_KEY=sk_live_..."</span>
 })
 
 <span class="comment"># Then search naturally</span>
@@ -822,7 +902,7 @@ ENVMEM_API_KEY=your-key npx envmem
       <p style="margin-top: 8px;">
         <a href="https://github.com/samihalawa/envmem-mcp">Open Source</a> ·
         <a href="https://www.npmjs.com/package/envmem">npm</a> ·
-        Made for developers who forget their env var names
+        © 2026 EnvMem
       </p>
     </div>
   </footer>

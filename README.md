@@ -1,5 +1,7 @@
 # EnvMem
 
+![EnvMem Hero](https://envmem.com/img/hero.jpg)
+
 **Your Environment Variables, Always at Hand**
 
 Personal environment variable memory with semantic search and project management. Multi-tenant MCP server that remembers all your API keys, secrets, and configurations.
@@ -7,7 +9,9 @@ Personal environment variable memory with semantic search and project management
 [![npm version](https://badge.fury.io/js/envmem.svg)](https://www.npmjs.com/package/envmem)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
 
-**Live**: [envmem.trigox.workers.dev](https://envmem.trigox.workers.dev) | **NPM**: [npmjs.com/package/envmem](https://www.npmjs.com/package/envmem)
+**Live**: [envmem.com](https://envmem.com) | **NPM**: [npmjs.com/package/envmem](https://www.npmjs.com/package/envmem)
+
+![EnvMem Terminal](https://envmem.com/img/terminal.jpg)
 
 ## Features
 
@@ -51,7 +55,7 @@ ENVMEM_API_KEY=your-key npx envmem
 {
   "mcpServers": {
     "envmem": {
-      "url": "https://envmem.trigox.workers.dev/mcp?apikey=your-api-key"
+      "url": "https://envmem.com/mcp?apikey=your-api-key"
     }
   }
 }

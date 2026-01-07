@@ -11,12 +11,12 @@
  *
  * Environment variables:
  *   ENVMEM_API_KEY - Your API key for authentication
- *   ENVMEM_URL - Custom server URL (default: https://envmem.trigox.workers.dev)
+ *   ENVMEM_URL - Custom server URL (default: https://envmem.com)
  */
 
 import { createInterface } from 'readline';
 
-const DEFAULT_URL = 'https://envmem.trigox.workers.dev/mcp';
+const DEFAULT_URL = 'https://envmem.com/mcp';
 
 // Parse command line arguments
 function parseArgs() {
