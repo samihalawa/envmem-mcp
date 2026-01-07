@@ -25,15 +25,13 @@ Personal environment variable memory with semantic search and project management
 
 ---
 
-## Quick Start
+## 🚀 Quick Start & MCP Configuration
 
-### Option 1: NPX
+EnvMem is designed to work seamlessly with any MCP-compatible client (like Claude Desktop, Cursor, or your own tools).
 
-```bash
-ENVMEM_API_KEY=your-key npx envmem
-```
+### Option 1: Claude Desktop (Recommended)
 
-### Option 2: Claude Desktop / Claude Code
+Add this to your `claude_desktop_config.json`:
 
 ```json
 {
@@ -42,20 +40,24 @@ ENVMEM_API_KEY=your-key npx envmem
       "command": "npx",
       "args": ["-y", "envmem"],
       "env": {
-        "ENVMEM_API_KEY": "your-api-key-here"
+        "ENVMEM_API_KEY": "your-secret-api-key"
       }
     }
   }
 }
 ```
 
-### Option 3: Direct URL
+> **Note:** Generate your API key at [envmem.com](https://envmem.com) or use any random string (it acts as your personal partition).
+
+### Option 2: Remote MCP (No Node.js required)
+
+If your MCP client supports remote URLs (SSE), you can connect directly without running anything locally:
 
 ```json
 {
   "mcpServers": {
     "envmem": {
-      "url": "https://envmem.com/mcp?apikey=your-api-key"
+      "url": "https://envmem.com/mcp?apikey=your-secret-api-key"
     }
   }
 }
