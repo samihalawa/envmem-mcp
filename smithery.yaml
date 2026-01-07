@@ -1,6 +1,19 @@
 runtime: container
+name: envmem
+version: "1.2.1"
+description: "Personal environment variable memory with AI-powered semantic search"
+build:
+  dockerfile: Dockerfile
+  dockerBuildPath: .
 startCommand:
-  command: node
-  args: ["bin/envmem.js"]
+  type: stdio
+configSchema:
+  type: object
+  properties:
+    apiKey:
+      type: string
+      description: "Enter your API key from envmem.com"
+  required:
+    - apiKey
 env:
   ENVMEM_URL: "https://envmem.com"
