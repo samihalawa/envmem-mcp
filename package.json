@@ -1,6 +1,6 @@
 {
 	"name": "envmem",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "EnvMem - Personal environment variable memory with semantic search. Store, search, and manage your environment variables with AI-powered semantic search.",
 	"main": "bin/envmem.js",
 	"type": "module",
