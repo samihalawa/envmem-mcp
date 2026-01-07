@@ -1,14 +1,6 @@
-runtime: node
-entrypoint: bin/envmem.js
-
+runtime: container
+startCommand:
+  command: node
+  args: ["bin/envmem.js"]
 env:
   ENVMEM_URL: "https://envmem.com"
-
-configSchema:
-  type: object
-  properties:
-    apiKey:
-      type: string
-      description: "Enter your API key from envmem.com"
-  required:
-    - apiKey
