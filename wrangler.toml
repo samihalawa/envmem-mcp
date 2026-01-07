@@ -3,6 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2024-12-13"
 compatibility_flags = ["nodejs_compat"]  # CRITICAL: Required for MCP SDK
 
+routes = [
+	{ pattern = "envmem.com", custom_domain = true },
+	{ pattern = "www.envmem.com", custom_domain = true }
+]
+
 # Cloudflare Workers AI with Gateway for observability
 [ai]
 binding = "AI"
