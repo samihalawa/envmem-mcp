@@ -147,7 +147,7 @@ export default {
         return new Response(JSON.stringify({
           status: 'healthy',
           service: 'envmem',
-          version: '1.2.0',
+          version: '1.2.1',
           userId: auth.userId,
           authenticated: auth.userId !== 'anonymous',
           stats,
@@ -162,7 +162,7 @@ export default {
 
         return new Response(JSON.stringify({
           name: 'envmem',
-          version: '1.2.0',
+          version: '1.2.1',
           description: 'Personal environment variable memory with semantic search',
           endpoints: {
             mcp: '/mcp',
@@ -544,7 +544,7 @@ async function handleJsonRpcRequest(
         },
         serverInfo: {
           name: 'envmem',
-          version: '1.2.0',
+          version: '1.2.1',
         },
         instructions: `EnvMem v1.2 - Personal environment variable memory with project management.
 
