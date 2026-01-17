@@ -636,13 +636,18 @@
       font-size: 12px;
       width: fit-content;
     }
-    .integration-card code {
+    .integration-card pre {
       background: var(--bg);
       border: 1px dashed var(--border);
       border-radius: 8px;
       padding: 10px;
       font-size: 12px;
       color: var(--text);
+      overflow-x: auto;
+    }
+    .integration-card pre code {
+      color: inherit;
+      font-family: 'Monaco', 'Menlo', monospace;
     }
     .integration-footnote {
       text-align: center;
@@ -780,7 +785,7 @@
           <span class="integration-chip">Claude Desktop / Claude Code</span>
           <h3>Local MCP Bridge</h3>
           <p>Keep secrets close to your editor with a local MCP server launched via <code>npx envmem</code>.</p>
-<code>{
+<pre><code>{
   "mcpServers": {
     "envmem": {
       "command": "npx",
@@ -788,13 +793,13 @@
       "env": { "ENVMEM_API_KEY": "your-key" }
     }
   }
-}</code>
+}</code></pre>
         </div>
         <div class="integration-card">
           <span class="integration-chip">Cursor</span>
           <h3>Cursor MCP</h3>
           <p>Add the same config to <code>~/.cursor/mcp.json</code> to reuse the EnvMem workspace across repos.</p>
-<code>{
+<pre><code>{
   "mcpServers": {
     "envmem": {
       "command": "npx",
@@ -802,19 +807,19 @@
       "env": { "ENVMEM_API_KEY": "your-key" }
     }
   }
-}</code>
+}</code></pre>
         </div>
         <div class="integration-card">
           <span class="integration-chip">Browser / Cloud</span>
           <h3>Remote SSE Endpoint</h3>
           <p>No local node? Point any MCP client at our hosted URL and keep secrets synced.</p>
-<code>{
+<pre><code>{
   "mcpServers": {
     "envmem": {
       "url": "https://envmem.com/mcp?apikey=your-key"
     }
   }
-}</code>
+}</code></pre>
         </div>
         <div class="integration-card">
           <span class="integration-chip">Security</span>
