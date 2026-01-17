@@ -63,6 +63,38 @@ If your MCP client supports remote URLs (SSE), you can connect directly without 
 }
 ```
 
+### Option 3: Cursor / Claude Code (VS Code)
+
+Add this to `~/.cursor/mcp.json` (or your Claude Code MCP config):
+
+```json
+{
+  "mcpServers": {
+    "envmem": {
+      "command": "npx",
+      "args": ["-y", "envmem"],
+      "env": {
+        "ENVMEM_API_KEY": "your-secret-api-key"
+      }
+    }
+  }
+}
+```
+
+### Option 4: Browser & Cloud Hosts
+
+Use the hosted SSE endpoint when you cannot run Node locally (e.g., browser-based IDEs or cloud runners):
+
+```json
+{
+  "mcpServers": {
+    "envmem": {
+      "url": "https://envmem.com/mcp?apikey=your-secret-api-key"
+    }
+  }
+}
+```
+
 ---
 
 ## Usage

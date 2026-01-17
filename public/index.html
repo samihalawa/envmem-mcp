@@ -103,6 +103,11 @@
       flex-wrap: wrap;
       margin-bottom: 60px;
     }
+    .hero .meta {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-top: 12px;
+    }
     .btn {
       padding: 14px 28px;
       border-radius: 8px;
@@ -577,6 +582,80 @@
     .code-block .string { color: var(--success); }
     .code-block .key { color: var(--accent); }
 
+    .section-lead {
+      text-align: center;
+      color: var(--text-muted);
+      max-width: 720px;
+      margin: 12px auto 32px;
+      font-size: 16px;
+    }
+
+    .integration-section {
+      padding: 80px 0;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .integration-section h2 {
+      text-align: center;
+      font-size: 32px;
+    }
+    .integration-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      margin-top: 32px;
+    }
+    .integration-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .integration-card h3 {
+      font-size: 18px;
+      color: var(--accent);
+    }
+    .integration-card p {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .integration-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 12px;
+      width: fit-content;
+    }
+    .integration-card pre {
+      background: var(--bg);
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      color: var(--text);
+      overflow-x: auto;
+    }
+    .integration-card pre code {
+      color: inherit;
+      font-family: 'Monaco', 'Menlo', monospace;
+    }
+    .integration-footnote {
+      text-align: center;
+      color: var(--text-muted);
+      margin-top: 24px;
+      font-size: 13px;
+    }
+
     /* Footer */
     footer {
       padding: 40px 0;
@@ -635,6 +714,7 @@
     <div class="container header-content">
       <a href="/" class="logo">Env<span>Mem</span></a>
       <nav>
+        <a href="#integrations">Integrations</a>
         <a href="#manage">Web App</a>
         <a href="#features">Features</a>
         <a href="#usage">CLI</a>
@@ -645,12 +725,14 @@
 
   <section class="hero">
     <div class="container">
-      <h1>Your Environment Variables,<br>Always at Hand</h1>
-      <p>Semantic search for your .env files. Multi-tenant MCP server that remembers all your API keys, secrets, and configurations.</p>
+      <h1>Enterprise-Ready Env Memory<br>for AI Workflows</h1>
+      <p>Semantic search and retrieval for your .env files with multi-tenant isolation. Ship faster with a corporate-grade experience that plugs into every MCP-capable workspace.</p>
       <div class="cta-buttons">
         <a href="#manage" class="btn btn-primary">Open Web App</a>
         <a href="https://www.npmjs.com/package/envmem" class="btn btn-secondary">npm i -g envmem</a>
+        <a href="#integrations" class="btn btn-secondary">View Integrations</a>
       </div>
+      <p class="meta">Works with Claude Desktop, Cursor, Claude Code, and any browser-based MCP client</p>
       
       <div class="hero-image">
         <img src="/img/hero.jpg" alt="EnvMem Dashboard Interface">
@@ -691,6 +773,61 @@
       <div class="terminal-showcase">
         <img src="/img/terminal.jpg" alt="EnvMem Terminal Interface">
       </div>
+    </div>
+  </section>
+
+  <section class="integration-section" id="integrations">
+    <div class="container">
+      <h2>Built for Every AI IDE</h2>
+      <p class="section-lead">Drop EnvMem into Claude Desktop, Cursor, Claude Code, or any browser-first MCP client with the same single configuration.</p>
+      <div class="integration-grid">
+        <div class="integration-card">
+          <span class="integration-chip">Claude Desktop / Claude Code</span>
+          <h3>Local MCP Bridge</h3>
+          <p>Keep secrets close to your editor with a local MCP server launched via <code>npx envmem</code>.</p>
+<pre><code>{
+  "mcpServers": {
+    "envmem": {
+      "command": "npx",
+      "args": ["-y", "envmem"],
+      "env": { "ENVMEM_API_KEY": "your-key" }
+    }
+  }
+}</code></pre>
+        </div>
+        <div class="integration-card">
+          <span class="integration-chip">Cursor</span>
+          <h3>Cursor MCP</h3>
+          <p>Add the same config to <code>~/.cursor/mcp.json</code> to reuse the EnvMem workspace across repos.</p>
+<pre><code>{
+  "mcpServers": {
+    "envmem": {
+      "command": "npx",
+      "args": ["-y", "envmem"],
+      "env": { "ENVMEM_API_KEY": "your-key" }
+    }
+  }
+}</code></pre>
+        </div>
+        <div class="integration-card">
+          <span class="integration-chip">Browser / Cloud</span>
+          <h3>Remote SSE Endpoint</h3>
+          <p>No local node? Point any MCP client at our hosted URL and keep secrets synced.</p>
+<pre><code>{
+  "mcpServers": {
+    "envmem": {
+      "url": "https://envmem.com/mcp?apikey=your-key"
+    }
+  }
+}</code></pre>
+        </div>
+        <div class="integration-card">
+          <span class="integration-chip">Security</span>
+          <h3>Per-Key Isolation</h3>
+          <p>Your API key is your partition. Rotate keys freely, and keep projects segmented by client or repo.</p>
+        </div>
+      </div>
+      <p class="integration-footnote">Tip: reuse the same ENVMEM_API_KEY across devices to keep your envs synchronized.</p>
     </div>
   </section>
 
@@ -862,7 +999,7 @@ DATABASE_URL=postgres://..."></textarea>
 <pre><span class="comment"># Option 1: NPX (Recommended)</span>
 ENVMEM_API_KEY=your-key npx envmem
 
-<span class="comment"># Option 2: Claude Desktop / Claude Code config</span>
+<span class="comment"># Option 2: Claude Desktop / Cursor / Claude Code config</span>
 {
   <span class="key">"mcpServers"</span>: {
     <span class="key">"envmem"</span>: {
