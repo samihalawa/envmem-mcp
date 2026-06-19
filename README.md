@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/samihalawa-envmem-mcp-badge.png)](https://mseep.ai/app/samihalawa-envmem-mcp)
+
 # EnvMem
 
 ![EnvMem Hero](https://envmem.com/img/hero.jpg)
